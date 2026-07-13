@@ -1,0 +1,1680 @@
+[
+  {
+    "candidate_id": "089dc429-9e94-4f3b-a8b9-cffd49ca06ce",
+    "hypothesis_id": "01c1110d-1cee-4136-a258-5538ede20f02",
+    "opportunity_quality": 0.5245,
+    "founder_fit_score": 60,
+    "composition_rows": [
+      {
+        "field_name": "market",
+        "value": "cdb21181-53ce-4eff-83d0-49bab3cbb704",
+        "is_null": false,
+        "source_refs": [
+          {
+            "evidence_id": "bb77bb02-4ff6-4dc3-ac72-07809b6e29a0",
+            "evidence_polarity": "supporting"
+          },
+          {
+            "evidence_id": "274f4950-7c0e-41bd-a3f1-afb830ec1899",
+            "evidence_polarity": "supporting"
+          }
+        ]
+      },
+      {
+        "field_name": "audience",
+        "value": "83630a57-0fc3-4550-9929-a66750802599",
+        "is_null": false,
+        "source_refs": [
+          {
+            "evidence_id": "047730c0-d4b6-478a-99e5-611cb98a145a",
+            "evidence_polarity": "supporting"
+          },
+          {
+            "evidence_id": "87781ba9-7fbc-42f1-a15e-71cda7b1c460",
+            "evidence_polarity": "supporting"
+          },
+          {
+            "evidence_id": "40962395-2239-4480-b4b5-baf3bfa5a0b8",
+            "evidence_polarity": "supporting"
+          }
+        ]
+      },
+      {
+        "field_name": "problem",
+        "value": "173a0c23-e41d-4c32-af0c-d484c9add01a",
+        "is_null": false,
+        "source_refs": [
+          {
+            "evidence_id": "047730c0-d4b6-478a-99e5-611cb98a145a",
+            "evidence_polarity": "supporting"
+          },
+          {
+            "evidence_id": "87781ba9-7fbc-42f1-a15e-71cda7b1c460",
+            "evidence_polarity": "supporting"
+          }
+        ]
+      },
+      {
+        "field_name": "hypothesis",
+        "value": "01c1110d-1cee-4136-a258-5538ede20f02",
+        "is_null": false,
+        "source_refs": [
+          {
+            "evidence_id": "87781ba9-7fbc-42f1-a15e-71cda7b1c460",
+            "evidence_polarity": "supporting"
+          },
+          {
+            "evidence_id": "047730c0-d4b6-478a-99e5-611cb98a145a",
+            "evidence_polarity": "supporting"
+          },
+          {
+            "evidence_id": "4ddc58f8-a8c5-4340-9a45-72cc27056cc8",
+            "evidence_polarity": "supporting"
+          },
+          {
+            "evidence_id": "40962395-2239-4480-b4b5-baf3bfa5a0b8",
+            "evidence_polarity": "supporting"
+          },
+          {
+            "evidence_id": "4bb1d4b0-7597-4dd7-b4eb-0793d8277949",
+            "evidence_polarity": "supporting"
+          },
+          {
+            "evidence_id": "182bd9be-4f02-46f5-88ad-454a2d865646",
+            "evidence_polarity": "supporting"
+          },
+          {
+            "evidence_id": "65027ef9-d562-4eba-8c50-e760a4001e42",
+            "evidence_polarity": "supporting"
+          },
+          {
+            "evidence_id": "a6df1cc7-28ba-4a82-8112-0c986d97e8aa",
+            "evidence_polarity": "supporting"
+          },
+          {
+            "evidence_id": "fe991ccf-a812-4bb2-8762-34614d58528c",
+            "evidence_polarity": "contradicting"
+          },
+          {
+            "evidence_id": "677a2e90-9f81-49b1-8207-2fe9fe93be09",
+            "evidence_polarity": "contradicting"
+          },
+          {
+            "evidence_id": "2ae07475-e535-49b2-a91e-f0ebcc7242f8",
+            "evidence_polarity": "supporting"
+          },
+          {
+            "evidence_id": "ff063c90-7e9f-4d68-bdf6-4b0045f3710d",
+            "evidence_polarity": "supporting"
+          },
+          {
+            "evidence_id": "b1edc615-9a89-45a4-b746-79e7215c83c4",
+            "evidence_polarity": "supporting"
+          },
+          {
+            "evidence_id": "d49e4b97-9e3c-4711-8de1-a7f28763a91a",
+            "evidence_polarity": "supporting"
+          },
+          {
+            "evidence_id": "4e2ef53b-3f65-44e4-a829-609e089c1ea8",
+            "evidence_polarity": "supporting"
+          },
+          {
+            "evidence_id": "48eeea86-69d7-4312-92d9-77d43859a0a9",
+            "evidence_polarity": "supporting"
+          },
+          {
+            "evidence_id": "f6668367-6025-4045-bf19-84fb8ba2c469",
+            "evidence_polarity": "supporting"
+          },
+          {
+            "evidence_id": "9d730186-6663-4a6b-8fef-71152b8ccc1f",
+            "evidence_polarity": "supporting"
+          },
+          {
+            "evidence_id": "1326bda0-7358-4264-a658-f4bcfa0ebf23",
+            "evidence_polarity": "supporting"
+          },
+          {
+            "evidence_id": "96709341-1845-46dd-aae9-556bd1847d26",
+            "evidence_polarity": "supporting"
+          },
+          {
+            "evidence_id": "13395f58-a260-4d51-9006-30649c0e9dee",
+            "evidence_polarity": "supporting"
+          },
+          {
+            "evidence_id": "50761a2b-e95b-431c-b263-1efbe62d21d9",
+            "evidence_polarity": "supporting"
+          },
+          {
+            "evidence_id": "dbb6d40c-6c46-47f4-9710-42ab3f550a6c",
+            "evidence_polarity": "supporting"
+          }
+        ]
+      },
+      {
+        "field_name": "business_model",
+        "value": "8dafe41b-ddbb-4a7d-a77f-da4fc12a8421",
+        "is_null": false,
+        "source_refs": [
+          {
+            "evidence_id": "fe991ccf-a812-4bb2-8762-34614d58528c",
+            "evidence_polarity": "supporting"
+          }
+        ]
+      }
+    ],
+    "linked_evidence": [
+      {
+        "evidence_id": "bb77bb02-4ff6-4dc3-ac72-07809b6e29a0",
+        "source_type": "marketplace",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-05T17:27:35.216Z",
+        "text_excerpt": "The Shopify App Store lists more than 20 subscription and recurring-order apps as of mid-2026, spanning flat-fee tools (Bold Subscriptions at $49.99/mo), free-tier options (native Shopify Subscriptions, Loop's free tier, Seal's free tier), and enterprise-oriented platforms charging $299-599/mo plus ",
+        "source_ref": "manual-seed://shopify-app-store-marketplace-overview",
+        "node_id": "cdb21181-53ce-4eff-83d0-49bab3cbb704",
+        "node_type": "market"
+      },
+      {
+        "evidence_id": "274f4950-7c0e-41bd-a3f1-afb830ec1899",
+        "source_type": "financial_signal",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-05T17:27:35.216Z",
+        "text_excerpt": "In April 2026, Recharge acquired competitor Skio for $105 million, consolidating two of the largest players in the Shopify subscription-app market. Skio's Shopify App Store listing showed 240+ reviews and a 5.0-star rating prior to the acquisition.",
+        "source_ref": "manual-seed://recharge-skio-acquisition-april-2026",
+        "node_id": "cdb21181-53ce-4eff-83d0-49bab3cbb704",
+        "node_type": "market"
+      },
+      {
+        "evidence_id": "047730c0-d4b6-478a-99e5-611cb98a145a",
+        "source_type": "review_complaint",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-05T17:38:44.613Z",
+        "text_excerpt": "A merchant posted on the Shopify Community forum describing\npersistent frustration with Shop Pay's handling of subscriptions: when\na customer's card on file expires, updating it is unusually difficult\ncompared to other checkout flows, and Shopify's own support could not\nresolve it after months. The ",
+        "source_ref": "manual-seed://shopify-community-shop-pay-subscription-issues",
+        "node_id": "83630a57-0fc3-4550-9929-a66750802599",
+        "node_type": "audience"
+      },
+      {
+        "evidence_id": "87781ba9-7fbc-42f1-a15e-71cda7b1c460",
+        "source_type": "review_complaint",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-05T17:38:44.613Z",
+        "text_excerpt": "Industry reporting (Shopifreaks) confirmed Shopify quietly\npatched a bug where removing a payment card from Shop Pay caused every\nactive subscription tied to that card to be cancelled automatically,\nacross every merchant on the platform, with no warning to merchants\nand no signal that the customer i",
+        "source_ref": "manual-seed://shopifreaks-shop-pay-silent-cancellation-bug",
+        "node_id": "83630a57-0fc3-4550-9929-a66750802599",
+        "node_type": "audience"
+      },
+      {
+        "evidence_id": "40962395-2239-4480-b4b5-baf3bfa5a0b8",
+        "source_type": "review_complaint",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-05T17:38:44.613Z",
+        "text_excerpt": "Shopify announced a related policy change effective May 4,\n2026: once a subscription is cancelled and the customer has no other\nactive subscriptions, their saved payment method is automatically\nrevoked. Merchants can reinstate the original payment method within a\n24-hour window if the cancellation w",
+        "source_ref": "manual-seed://shopify-payment-method-revocation-policy-may-2026",
+        "node_id": "83630a57-0fc3-4550-9929-a66750802599",
+        "node_type": "audience"
+      },
+      {
+        "evidence_id": "047730c0-d4b6-478a-99e5-611cb98a145a",
+        "source_type": "review_complaint",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-05T17:38:44.613Z",
+        "text_excerpt": "A merchant posted on the Shopify Community forum describing\npersistent frustration with Shop Pay's handling of subscriptions: when\na customer's card on file expires, updating it is unusually difficult\ncompared to other checkout flows, and Shopify's own support could not\nresolve it after months. The ",
+        "source_ref": "manual-seed://shopify-community-shop-pay-subscription-issues",
+        "node_id": "173a0c23-e41d-4c32-af0c-d484c9add01a",
+        "node_type": "problem"
+      },
+      {
+        "evidence_id": "87781ba9-7fbc-42f1-a15e-71cda7b1c460",
+        "source_type": "review_complaint",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-05T17:38:44.613Z",
+        "text_excerpt": "Industry reporting (Shopifreaks) confirmed Shopify quietly\npatched a bug where removing a payment card from Shop Pay caused every\nactive subscription tied to that card to be cancelled automatically,\nacross every merchant on the platform, with no warning to merchants\nand no signal that the customer i",
+        "source_ref": "manual-seed://shopifreaks-shop-pay-silent-cancellation-bug",
+        "node_id": "173a0c23-e41d-4c32-af0c-d484c9add01a",
+        "node_type": "problem"
+      },
+      {
+        "evidence_id": "87781ba9-7fbc-42f1-a15e-71cda7b1c460",
+        "source_type": "review_complaint",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-05T17:38:44.613Z",
+        "text_excerpt": "Industry reporting (Shopifreaks) confirmed Shopify quietly\npatched a bug where removing a payment card from Shop Pay caused every\nactive subscription tied to that card to be cancelled automatically,\nacross every merchant on the platform, with no warning to merchants\nand no signal that the customer i",
+        "source_ref": "manual-seed://shopifreaks-shop-pay-silent-cancellation-bug",
+        "node_id": "01c1110d-1cee-4136-a258-5538ede20f02",
+        "node_type": "hypothesis"
+      },
+      {
+        "evidence_id": "047730c0-d4b6-478a-99e5-611cb98a145a",
+        "source_type": "review_complaint",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-05T17:38:44.613Z",
+        "text_excerpt": "A merchant posted on the Shopify Community forum describing\npersistent frustration with Shop Pay's handling of subscriptions: when\na customer's card on file expires, updating it is unusually difficult\ncompared to other checkout flows, and Shopify's own support could not\nresolve it after months. The ",
+        "source_ref": "manual-seed://shopify-community-shop-pay-subscription-issues",
+        "node_id": "01c1110d-1cee-4136-a258-5538ede20f02",
+        "node_type": "hypothesis"
+      },
+      {
+        "evidence_id": "4ddc58f8-a8c5-4340-9a45-72cc27056cc8",
+        "source_type": "industry_report",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-05T17:27:35.216Z",
+        "text_excerpt": "Industry analysis of Shopify subscription commerce reports average monthly churn near 5%, compounding to roughly 46% annual churn if unaddressed. Analysts explicitly distinguish voluntary churn (a customer choosing to cancel) from involuntary churn (failed payments, forced platform-side cancellation",
+        "source_ref": "manual-seed://subscription-churn-industry-analysis",
+        "node_id": "01c1110d-1cee-4136-a258-5538ede20f02",
+        "node_type": "hypothesis"
+      },
+      {
+        "evidence_id": "40962395-2239-4480-b4b5-baf3bfa5a0b8",
+        "source_type": "review_complaint",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-05T17:38:44.613Z",
+        "text_excerpt": "Shopify announced a related policy change effective May 4,\n2026: once a subscription is cancelled and the customer has no other\nactive subscriptions, their saved payment method is automatically\nrevoked. Merchants can reinstate the original payment method within a\n24-hour window if the cancellation w",
+        "source_ref": "manual-seed://shopify-payment-method-revocation-policy-may-2026",
+        "node_id": "01c1110d-1cee-4136-a258-5538ede20f02",
+        "node_type": "hypothesis"
+      },
+      {
+        "evidence_id": "4bb1d4b0-7597-4dd7-b4eb-0793d8277949",
+        "source_type": "search_signal",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-06T21:29:07.100Z",
+        "text_excerpt": "[Churn Management Strategies To Reduce Subscriber Churn] recurly-logo\n\nProducts\n\nSolutions\n\nResources\n\nicon-cursor-box\n\nAugust 15, 2025\n\n# Churn management strategies to reduce and prevent subscriber churn\n\nMatthew Calhoun\n\nContent Marketing Writer\n\nTABLE OF CONTENTS\n\nTOPICS\n\nRELATED POSTS\n\nKey take",
+        "source_ref": "https://recurly.com/blog/strategies-to-reduce-and-prevent-subscriber-churn",
+        "node_id": "01c1110d-1cee-4136-a258-5538ede20f02",
+        "node_type": "hypothesis"
+      },
+      {
+        "evidence_id": "182bd9be-4f02-46f5-88ad-454a2d865646",
+        "source_type": "search_signal",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-06T21:29:07.100Z",
+        "text_excerpt": "[Defined: What Is Dunning Management? (And Why It Isn't Just Collections) - Zuora] Day 15+: The subscription status changes. This might trigger a “service degradation” (limiting features) or a full “service suspension” until payment is received.\n\n## Strategies to reduce involuntary churn\n\nInvoluntar",
+        "source_ref": "https://www.zuora.com/glossary/dunning-management",
+        "node_id": "01c1110d-1cee-4136-a258-5538ede20f02",
+        "node_type": "hypothesis"
+      },
+      {
+        "evidence_id": "65027ef9-d562-4eba-8c50-e760a4001e42",
+        "source_type": "search_signal",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-06T21:29:07.100Z",
+        "text_excerpt": "[Understanding Involuntary Churn | Guide | Butter Payments] ## What is involuntary churn?\n\nInvoluntary churn (also called accidental churn) occurs when a customer’s legitimate payment transaction is declined, resulting in their subscription being canceled even though they still want the product or s",
+        "source_ref": "https://www.butterpayments.com/guides/disputes-chargebacks-guides/involuntary-churn",
+        "node_id": "01c1110d-1cee-4136-a258-5538ede20f02",
+        "node_type": "hypothesis"
+      },
+      {
+        "evidence_id": "a6df1cc7-28ba-4a82-8112-0c986d97e8aa",
+        "source_type": "search_signal",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-06T21:29:07.100Z",
+        "text_excerpt": "[Involuntary churn 101: what is it and how it relates to Failed Payments - FlyCode] Unlike voluntary churn, where customers actively cancel their subscriptions, involuntary churn happens without their intention, often leaving customers unaware until they lose access to the service. This not only imp",
+        "source_ref": "https://www.flycode.com/blog/involuntary-churn-101-what-is-it-and-how-it-relates-to-failed-payments",
+        "node_id": "01c1110d-1cee-4136-a258-5538ede20f02",
+        "node_type": "hypothesis"
+      },
+      {
+        "evidence_id": "fe991ccf-a812-4bb2-8762-34614d58528c",
+        "source_type": "competitor_material",
+        "evidence_polarity": "contradicting",
+        "timestamp": "2026-07-05T18:19:38.886Z",
+        "text_excerpt": "Recharge's Shopify App Store listing states pricing tiers from\n$25 to $499+ per month, plus a transaction fee of 1.0-1.49% and $0.19\nper order. The listing describes Recharge as built for growing and\nenterprise subscription brands, with dunning and payment-recovery\ntooling included at every tier.",
+        "source_ref": "manual-seed://recharge-app-store-listing",
+        "node_id": "01c1110d-1cee-4136-a258-5538ede20f02",
+        "node_type": "hypothesis"
+      },
+      {
+        "evidence_id": "677a2e90-9f81-49b1-8207-2fe9fe93be09",
+        "source_type": "search_signal",
+        "evidence_polarity": "contradicting",
+        "timestamp": "2026-07-06T21:29:07.100Z",
+        "text_excerpt": "[Prevent Passive Churn With Automated Recharge Dunning Features | Recharge] To tackle active churn, understand the reasons customers cancel their subscriptions and make moves to address those concerns. Passive churn, on the other hand, is oftentimes involuntary and unintentional, making it more diff",
+        "source_ref": "https://getrecharge.com/blog/prevent-passive-churn-with-automated-recharge-dunning-features",
+        "node_id": "01c1110d-1cee-4136-a258-5538ede20f02",
+        "node_type": "hypothesis"
+      },
+      {
+        "evidence_id": "2ae07475-e535-49b2-a91e-f0ebcc7242f8",
+        "source_type": "search_signal",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-06T21:29:07.100Z",
+        "text_excerpt": "[Dunning Management Tips: Increase Revenue & Reduce Involuntary Churn] For eCommerce subscription brands, managing these issues effectively is essential in minimizing churn and lost revenue. Payment failure is a recurrent issue for e-commerce companies offering subscriptions which hampers their bott",
+        "source_ref": "https://www.loopwork.co/blog/dunning-management-tips",
+        "node_id": "01c1110d-1cee-4136-a258-5538ede20f02",
+        "node_type": "hypothesis"
+      },
+      {
+        "evidence_id": "ff063c90-7e9f-4d68-bdf6-4b0045f3710d",
+        "source_type": "search_signal",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-06T21:29:07.100Z",
+        "text_excerpt": "[Cancellation & Dunning Management in Subscriptions for Shopify Checkout • Support] Cancellation management settings let you control the process your customers must follow to cancel their subscriptions within the customer portal. You can also configure customer retention actions to present targeted ",
+        "source_ref": "https://support.boldcommerce.com/boldsubscriptions/cancellation-dunning-management-in-subscriptions-f",
+        "node_id": "01c1110d-1cee-4136-a258-5538ede20f02",
+        "node_type": "hypothesis"
+      },
+      {
+        "evidence_id": "b1edc615-9a89-45a4-b746-79e7215c83c4",
+        "source_type": "search_signal",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-06T21:29:07.100Z",
+        "text_excerpt": "[What is Involuntary Churn & How to Prevent Lost Revenue from Failed Payments] For example, subscription payment solutions like Cleeng recover as much as 35% of failed renewal payments thanks to customer-tailored dunning strategies and local expertise.\n\n### 2) Opt for smart payment routing\n\nDynamic ",
+        "source_ref": "https://blog.cleeng.com/involuntary-churn-how-to-prevent-lost-revenue-from-failed-subscription-payments",
+        "node_id": "01c1110d-1cee-4136-a258-5538ede20f02",
+        "node_type": "hypothesis"
+      },
+      {
+        "evidence_id": "d49e4b97-9e3c-4711-8de1-a7f28763a91a",
+        "source_type": "search_signal",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-06T21:29:07.100Z",
+        "text_excerpt": "[Utterbond vs Recharge vs Bold Compared: Which Wins in 2026?] Best use cases for Build-a-Box:\n\n Coffee brands: Let subscribers choose roasts, grind sizes, and bag weights each cycle\n Supplement brands: Build custom stacks (protein + pre-workout + vitamins)\n Beauty/skincare brands: Personalized regim",
+        "source_ref": "https://www.utterbond.com/blog/utterbond-vs-recharge-vs-bold-subscriptions",
+        "node_id": "01c1110d-1cee-4136-a258-5538ede20f02",
+        "node_type": "hypothesis"
+      },
+      {
+        "evidence_id": "4e2ef53b-3f65-44e4-a829-609e089c1ea8",
+        "source_type": "search_signal",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-06T21:29:07.100Z",
+        "text_excerpt": "[Dunning Best Practices - Churn Buster] ### Wrapping Up:\n\nFailed payments can be a silent killer for your company, if you don’t handle them properly.\n\nWith the right dunning management, this avoidable issue can be effectively addressed, preserving your revenue. Churn Buster offers comprehensive tool",
+        "source_ref": "https://churnbuster.io/dunning-best-practices",
+        "node_id": "01c1110d-1cee-4136-a258-5538ede20f02",
+        "node_type": "hypothesis"
+      },
+      {
+        "evidence_id": "48eeea86-69d7-4312-92d9-77d43859a0a9",
+        "source_type": "search_signal",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-07T06:19:37.524Z",
+        "text_excerpt": "[Churn Management Strategies To Reduce Subscriber Churn] recurly-logo\n\nProducts\n\nSolutions\n\nResources\n\nicon-cursor-box\n\nAugust 15, 2025\n\n# Churn management strategies to reduce and prevent subscriber churn\n\nMatthew Calhoun\n\nContent Marketing Writer\n\nTABLE OF CONTENTS\n\nTOPICS\n\nRELATED POSTS\n\nKey take",
+        "source_ref": "https://recurly.com/blog/strategies-to-reduce-and-prevent-subscriber-churn",
+        "node_id": "01c1110d-1cee-4136-a258-5538ede20f02",
+        "node_type": "hypothesis"
+      },
+      {
+        "evidence_id": "f6668367-6025-4045-bf19-84fb8ba2c469",
+        "source_type": "search_signal",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-07T06:19:37.524Z",
+        "text_excerpt": "[SaaS Dunning Management: How To Recover Failed Payments] ## Voluntary vs. Involuntary Churn\n\nVoluntary churn occurs when customers actively decide to unsubscribe from your service. Their reasons could include a bad experience, your service or product no longer meets their needs, they don’t feel the",
+        "source_ref": "https://blog.payproglobal.com/saas-dunning-management",
+        "node_id": "01c1110d-1cee-4136-a258-5538ede20f02",
+        "node_type": "hypothesis"
+      },
+      {
+        "evidence_id": "9d730186-6663-4a6b-8fef-71152b8ccc1f",
+        "source_type": "search_signal",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-07T06:19:37.524Z",
+        "text_excerpt": "[Manage Involuntary Churn with Loop’s Smart Dunning Management] Implementing robust dunning analytics to address this is crucial. By monitoring and analyzing payment failures, you can understand their impact on your revenue and develop strategies to mitigate them. A comprehensive dunning management ",
+        "source_ref": "https://www.loopwork.co/blog/manage-involuntary-churn-with-smart-dunning-management",
+        "node_id": "01c1110d-1cee-4136-a258-5538ede20f02",
+        "node_type": "hypothesis"
+      },
+      {
+        "evidence_id": "1326bda0-7358-4264-a658-f4bcfa0ebf23",
+        "source_type": "search_signal",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-07T06:19:37.524Z",
+        "text_excerpt": "[Dunning Management: The Complete Guide for SaaS (2026)] Dunning management targets involuntary churn caused by failed payments, while churn management broadly addresses all the reasons subscribers cancel or disengage.  \n    \n  The distinction matters because the fix for each is completely different",
+        "source_ref": "https://baremetrics.com/blog/dunning-management",
+        "node_id": "01c1110d-1cee-4136-a258-5538ede20f02",
+        "node_type": "hypothesis"
+      },
+      {
+        "evidence_id": "96709341-1845-46dd-aae9-556bd1847d26",
+        "source_type": "search_signal",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-07T06:19:37.524Z",
+        "text_excerpt": "[Defined: What Is Dunning Management? (And Why It Isn't Just Collections) - Zuora] Day 15+: The subscription status changes. This might trigger a “service degradation” (limiting features) or a full “service suspension” until payment is received.\n\n## Strategies to reduce involuntary churn\n\nInvoluntar",
+        "source_ref": "https://www.zuora.com/glossary/dunning-management",
+        "node_id": "01c1110d-1cee-4136-a258-5538ede20f02",
+        "node_type": "hypothesis"
+      },
+      {
+        "evidence_id": "13395f58-a260-4d51-9006-30649c0e9dee",
+        "source_type": "search_signal",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-07T06:19:37.524Z",
+        "text_excerpt": "[What is Involuntary Churn & How to Prevent Lost Revenue from Failed Payments] For example, subscription payment solutions like Cleeng recover as much as 35% of failed renewal payments thanks to customer-tailored dunning strategies and local expertise.\n\n### 2) Opt for smart payment routing\n\nDynamic ",
+        "source_ref": "https://blog.cleeng.com/involuntary-churn-how-to-prevent-lost-revenue-from-failed-subscription-payments",
+        "node_id": "01c1110d-1cee-4136-a258-5538ede20f02",
+        "node_type": "hypothesis"
+      },
+      {
+        "evidence_id": "50761a2b-e95b-431c-b263-1efbe62d21d9",
+        "source_type": "search_signal",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-07T06:19:37.524Z",
+        "text_excerpt": "[Dunning Best Practices - Churn Buster] ### Wrapping Up:\n\nFailed payments can be a silent killer for your company, if you don’t handle them properly.\n\nWith the right dunning management, this avoidable issue can be effectively addressed, preserving your revenue. Churn Buster offers comprehensive tool",
+        "source_ref": "https://churnbuster.io/dunning-best-practices",
+        "node_id": "01c1110d-1cee-4136-a258-5538ede20f02",
+        "node_type": "hypothesis"
+      },
+      {
+        "evidence_id": "dbb6d40c-6c46-47f4-9710-42ab3f550a6c",
+        "source_type": "search_signal",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-07T06:20:45.914Z",
+        "text_excerpt": "[Recharge vs. Bold vs. Loop: Which Shopify Subscription App Is Best ...] ### If you're scaling past the entry tier:\n\nThis is where automated dunning starts to matter. Failed payments compound — at scale, even a 5% failure rate on 10,000 orders is 500 subscribers per month at risk. You want a platfor",
+        "source_ref": "https://www.loopwork.co/blog/recharge-vs-bold-subscriptions",
+        "node_id": "01c1110d-1cee-4136-a258-5538ede20f02",
+        "node_type": "hypothesis"
+      },
+      {
+        "evidence_id": "fe991ccf-a812-4bb2-8762-34614d58528c",
+        "source_type": "competitor_material",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-05T18:19:38.886Z",
+        "text_excerpt": "Recharge's Shopify App Store listing states pricing tiers from\n$25 to $499+ per month, plus a transaction fee of 1.0-1.49% and $0.19\nper order. The listing describes Recharge as built for growing and\nenterprise subscription brands, with dunning and payment-recovery\ntooling included at every tier.",
+        "source_ref": "manual-seed://recharge-app-store-listing",
+        "node_id": "8dafe41b-ddbb-4a7d-a77f-da4fc12a8421",
+        "node_type": "business_model"
+      }
+    ]
+  },
+  {
+    "candidate_id": "95271656-9931-42c2-9805-f0d0682ff996",
+    "hypothesis_id": "4032b7b9-8e31-4776-bbca-06e6bfcb4340",
+    "opportunity_quality": 0.5275,
+    "founder_fit_score": 60,
+    "composition_rows": [
+      {
+        "field_name": "market",
+        "value": "cdb21181-53ce-4eff-83d0-49bab3cbb704",
+        "is_null": false,
+        "source_refs": [
+          {
+            "evidence_id": "bb77bb02-4ff6-4dc3-ac72-07809b6e29a0",
+            "evidence_polarity": "supporting"
+          },
+          {
+            "evidence_id": "274f4950-7c0e-41bd-a3f1-afb830ec1899",
+            "evidence_polarity": "supporting"
+          }
+        ]
+      },
+      {
+        "field_name": "audience",
+        "value": "83630a57-0fc3-4550-9929-a66750802599",
+        "is_null": false,
+        "source_refs": [
+          {
+            "evidence_id": "047730c0-d4b6-478a-99e5-611cb98a145a",
+            "evidence_polarity": "supporting"
+          },
+          {
+            "evidence_id": "87781ba9-7fbc-42f1-a15e-71cda7b1c460",
+            "evidence_polarity": "supporting"
+          },
+          {
+            "evidence_id": "40962395-2239-4480-b4b5-baf3bfa5a0b8",
+            "evidence_polarity": "supporting"
+          }
+        ]
+      },
+      {
+        "field_name": "problem",
+        "value": "173a0c23-e41d-4c32-af0c-d484c9add01a",
+        "is_null": false,
+        "source_refs": [
+          {
+            "evidence_id": "047730c0-d4b6-478a-99e5-611cb98a145a",
+            "evidence_polarity": "supporting"
+          },
+          {
+            "evidence_id": "87781ba9-7fbc-42f1-a15e-71cda7b1c460",
+            "evidence_polarity": "supporting"
+          }
+        ]
+      },
+      {
+        "field_name": "hypothesis",
+        "value": "4032b7b9-8e31-4776-bbca-06e6bfcb4340",
+        "is_null": false,
+        "source_refs": [
+          {
+            "evidence_id": "87781ba9-7fbc-42f1-a15e-71cda7b1c460",
+            "evidence_polarity": "supporting"
+          },
+          {
+            "evidence_id": "047730c0-d4b6-478a-99e5-611cb98a145a",
+            "evidence_polarity": "supporting"
+          },
+          {
+            "evidence_id": "4ddc58f8-a8c5-4340-9a45-72cc27056cc8",
+            "evidence_polarity": "supporting"
+          },
+          {
+            "evidence_id": "4bb1d4b0-7597-4dd7-b4eb-0793d8277949",
+            "evidence_polarity": "supporting"
+          },
+          {
+            "evidence_id": "677a2e90-9f81-49b1-8207-2fe9fe93be09",
+            "evidence_polarity": "supporting"
+          },
+          {
+            "evidence_id": "ff063c90-7e9f-4d68-bdf6-4b0045f3710d",
+            "evidence_polarity": "supporting"
+          },
+          {
+            "evidence_id": "182bd9be-4f02-46f5-88ad-454a2d865646",
+            "evidence_polarity": "supporting"
+          },
+          {
+            "evidence_id": "b1edc615-9a89-45a4-b746-79e7215c83c4",
+            "evidence_polarity": "supporting"
+          },
+          {
+            "evidence_id": "2ae07475-e535-49b2-a91e-f0ebcc7242f8",
+            "evidence_polarity": "supporting"
+          },
+          {
+            "evidence_id": "48eeea86-69d7-4312-92d9-77d43859a0a9",
+            "evidence_polarity": "supporting"
+          },
+          {
+            "evidence_id": "1326bda0-7358-4264-a658-f4bcfa0ebf23",
+            "evidence_polarity": "supporting"
+          },
+          {
+            "evidence_id": "f6668367-6025-4045-bf19-84fb8ba2c469",
+            "evidence_polarity": "supporting"
+          },
+          {
+            "evidence_id": "9d730186-6663-4a6b-8fef-71152b8ccc1f",
+            "evidence_polarity": "supporting"
+          },
+          {
+            "evidence_id": "13395f58-a260-4d51-9006-30649c0e9dee",
+            "evidence_polarity": "supporting"
+          },
+          {
+            "evidence_id": "50761a2b-e95b-431c-b263-1efbe62d21d9",
+            "evidence_polarity": "supporting"
+          },
+          {
+            "evidence_id": "ff642e6f-5223-4068-8edb-2a745276d454",
+            "evidence_polarity": "supporting"
+          },
+          {
+            "evidence_id": "56f2292d-02a4-4c7e-bb13-234c654a8778",
+            "evidence_polarity": "supporting"
+          },
+          {
+            "evidence_id": "40962395-2239-4480-b4b5-baf3bfa5a0b8",
+            "evidence_polarity": "contradicting"
+          }
+        ]
+      },
+      {
+        "field_name": "business_model",
+        "value": "8dafe41b-ddbb-4a7d-a77f-da4fc12a8421",
+        "is_null": false,
+        "source_refs": [
+          {
+            "evidence_id": "fe991ccf-a812-4bb2-8762-34614d58528c",
+            "evidence_polarity": "supporting"
+          }
+        ]
+      }
+    ],
+    "linked_evidence": [
+      {
+        "evidence_id": "bb77bb02-4ff6-4dc3-ac72-07809b6e29a0",
+        "source_type": "marketplace",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-05T17:27:35.216Z",
+        "text_excerpt": "The Shopify App Store lists more than 20 subscription and recurring-order apps as of mid-2026, spanning flat-fee tools (Bold Subscriptions at $49.99/mo), free-tier options (native Shopify Subscriptions, Loop's free tier, Seal's free tier), and enterprise-oriented platforms charging $299-599/mo plus ",
+        "source_ref": "manual-seed://shopify-app-store-marketplace-overview",
+        "node_id": "cdb21181-53ce-4eff-83d0-49bab3cbb704",
+        "node_type": "market"
+      },
+      {
+        "evidence_id": "274f4950-7c0e-41bd-a3f1-afb830ec1899",
+        "source_type": "financial_signal",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-05T17:27:35.216Z",
+        "text_excerpt": "In April 2026, Recharge acquired competitor Skio for $105 million, consolidating two of the largest players in the Shopify subscription-app market. Skio's Shopify App Store listing showed 240+ reviews and a 5.0-star rating prior to the acquisition.",
+        "source_ref": "manual-seed://recharge-skio-acquisition-april-2026",
+        "node_id": "cdb21181-53ce-4eff-83d0-49bab3cbb704",
+        "node_type": "market"
+      },
+      {
+        "evidence_id": "047730c0-d4b6-478a-99e5-611cb98a145a",
+        "source_type": "review_complaint",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-05T17:38:44.613Z",
+        "text_excerpt": "A merchant posted on the Shopify Community forum describing\npersistent frustration with Shop Pay's handling of subscriptions: when\na customer's card on file expires, updating it is unusually difficult\ncompared to other checkout flows, and Shopify's own support could not\nresolve it after months. The ",
+        "source_ref": "manual-seed://shopify-community-shop-pay-subscription-issues",
+        "node_id": "83630a57-0fc3-4550-9929-a66750802599",
+        "node_type": "audience"
+      },
+      {
+        "evidence_id": "87781ba9-7fbc-42f1-a15e-71cda7b1c460",
+        "source_type": "review_complaint",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-05T17:38:44.613Z",
+        "text_excerpt": "Industry reporting (Shopifreaks) confirmed Shopify quietly\npatched a bug where removing a payment card from Shop Pay caused every\nactive subscription tied to that card to be cancelled automatically,\nacross every merchant on the platform, with no warning to merchants\nand no signal that the customer i",
+        "source_ref": "manual-seed://shopifreaks-shop-pay-silent-cancellation-bug",
+        "node_id": "83630a57-0fc3-4550-9929-a66750802599",
+        "node_type": "audience"
+      },
+      {
+        "evidence_id": "40962395-2239-4480-b4b5-baf3bfa5a0b8",
+        "source_type": "review_complaint",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-05T17:38:44.613Z",
+        "text_excerpt": "Shopify announced a related policy change effective May 4,\n2026: once a subscription is cancelled and the customer has no other\nactive subscriptions, their saved payment method is automatically\nrevoked. Merchants can reinstate the original payment method within a\n24-hour window if the cancellation w",
+        "source_ref": "manual-seed://shopify-payment-method-revocation-policy-may-2026",
+        "node_id": "83630a57-0fc3-4550-9929-a66750802599",
+        "node_type": "audience"
+      },
+      {
+        "evidence_id": "047730c0-d4b6-478a-99e5-611cb98a145a",
+        "source_type": "review_complaint",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-05T17:38:44.613Z",
+        "text_excerpt": "A merchant posted on the Shopify Community forum describing\npersistent frustration with Shop Pay's handling of subscriptions: when\na customer's card on file expires, updating it is unusually difficult\ncompared to other checkout flows, and Shopify's own support could not\nresolve it after months. The ",
+        "source_ref": "manual-seed://shopify-community-shop-pay-subscription-issues",
+        "node_id": "173a0c23-e41d-4c32-af0c-d484c9add01a",
+        "node_type": "problem"
+      },
+      {
+        "evidence_id": "87781ba9-7fbc-42f1-a15e-71cda7b1c460",
+        "source_type": "review_complaint",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-05T17:38:44.613Z",
+        "text_excerpt": "Industry reporting (Shopifreaks) confirmed Shopify quietly\npatched a bug where removing a payment card from Shop Pay caused every\nactive subscription tied to that card to be cancelled automatically,\nacross every merchant on the platform, with no warning to merchants\nand no signal that the customer i",
+        "source_ref": "manual-seed://shopifreaks-shop-pay-silent-cancellation-bug",
+        "node_id": "173a0c23-e41d-4c32-af0c-d484c9add01a",
+        "node_type": "problem"
+      },
+      {
+        "evidence_id": "87781ba9-7fbc-42f1-a15e-71cda7b1c460",
+        "source_type": "review_complaint",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-05T17:38:44.613Z",
+        "text_excerpt": "Industry reporting (Shopifreaks) confirmed Shopify quietly\npatched a bug where removing a payment card from Shop Pay caused every\nactive subscription tied to that card to be cancelled automatically,\nacross every merchant on the platform, with no warning to merchants\nand no signal that the customer i",
+        "source_ref": "manual-seed://shopifreaks-shop-pay-silent-cancellation-bug",
+        "node_id": "4032b7b9-8e31-4776-bbca-06e6bfcb4340",
+        "node_type": "hypothesis"
+      },
+      {
+        "evidence_id": "047730c0-d4b6-478a-99e5-611cb98a145a",
+        "source_type": "review_complaint",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-05T17:38:44.613Z",
+        "text_excerpt": "A merchant posted on the Shopify Community forum describing\npersistent frustration with Shop Pay's handling of subscriptions: when\na customer's card on file expires, updating it is unusually difficult\ncompared to other checkout flows, and Shopify's own support could not\nresolve it after months. The ",
+        "source_ref": "manual-seed://shopify-community-shop-pay-subscription-issues",
+        "node_id": "4032b7b9-8e31-4776-bbca-06e6bfcb4340",
+        "node_type": "hypothesis"
+      },
+      {
+        "evidence_id": "4ddc58f8-a8c5-4340-9a45-72cc27056cc8",
+        "source_type": "industry_report",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-05T17:27:35.216Z",
+        "text_excerpt": "Industry analysis of Shopify subscription commerce reports average monthly churn near 5%, compounding to roughly 46% annual churn if unaddressed. Analysts explicitly distinguish voluntary churn (a customer choosing to cancel) from involuntary churn (failed payments, forced platform-side cancellation",
+        "source_ref": "manual-seed://subscription-churn-industry-analysis",
+        "node_id": "4032b7b9-8e31-4776-bbca-06e6bfcb4340",
+        "node_type": "hypothesis"
+      },
+      {
+        "evidence_id": "4bb1d4b0-7597-4dd7-b4eb-0793d8277949",
+        "source_type": "search_signal",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-06T21:29:07.100Z",
+        "text_excerpt": "[Churn Management Strategies To Reduce Subscriber Churn] recurly-logo\n\nProducts\n\nSolutions\n\nResources\n\nicon-cursor-box\n\nAugust 15, 2025\n\n# Churn management strategies to reduce and prevent subscriber churn\n\nMatthew Calhoun\n\nContent Marketing Writer\n\nTABLE OF CONTENTS\n\nTOPICS\n\nRELATED POSTS\n\nKey take",
+        "source_ref": "https://recurly.com/blog/strategies-to-reduce-and-prevent-subscriber-churn",
+        "node_id": "4032b7b9-8e31-4776-bbca-06e6bfcb4340",
+        "node_type": "hypothesis"
+      },
+      {
+        "evidence_id": "677a2e90-9f81-49b1-8207-2fe9fe93be09",
+        "source_type": "search_signal",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-06T21:29:07.100Z",
+        "text_excerpt": "[Prevent Passive Churn With Automated Recharge Dunning Features | Recharge] To tackle active churn, understand the reasons customers cancel their subscriptions and make moves to address those concerns. Passive churn, on the other hand, is oftentimes involuntary and unintentional, making it more diff",
+        "source_ref": "https://getrecharge.com/blog/prevent-passive-churn-with-automated-recharge-dunning-features",
+        "node_id": "4032b7b9-8e31-4776-bbca-06e6bfcb4340",
+        "node_type": "hypothesis"
+      },
+      {
+        "evidence_id": "ff063c90-7e9f-4d68-bdf6-4b0045f3710d",
+        "source_type": "search_signal",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-06T21:29:07.100Z",
+        "text_excerpt": "[Cancellation & Dunning Management in Subscriptions for Shopify Checkout • Support] Cancellation management settings let you control the process your customers must follow to cancel their subscriptions within the customer portal. You can also configure customer retention actions to present targeted ",
+        "source_ref": "https://support.boldcommerce.com/boldsubscriptions/cancellation-dunning-management-in-subscriptions-f",
+        "node_id": "4032b7b9-8e31-4776-bbca-06e6bfcb4340",
+        "node_type": "hypothesis"
+      },
+      {
+        "evidence_id": "182bd9be-4f02-46f5-88ad-454a2d865646",
+        "source_type": "search_signal",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-06T21:29:07.100Z",
+        "text_excerpt": "[Defined: What Is Dunning Management? (And Why It Isn't Just Collections) - Zuora] Day 15+: The subscription status changes. This might trigger a “service degradation” (limiting features) or a full “service suspension” until payment is received.\n\n## Strategies to reduce involuntary churn\n\nInvoluntar",
+        "source_ref": "https://www.zuora.com/glossary/dunning-management",
+        "node_id": "4032b7b9-8e31-4776-bbca-06e6bfcb4340",
+        "node_type": "hypothesis"
+      },
+      {
+        "evidence_id": "b1edc615-9a89-45a4-b746-79e7215c83c4",
+        "source_type": "search_signal",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-06T21:29:07.100Z",
+        "text_excerpt": "[What is Involuntary Churn & How to Prevent Lost Revenue from Failed Payments] For example, subscription payment solutions like Cleeng recover as much as 35% of failed renewal payments thanks to customer-tailored dunning strategies and local expertise.\n\n### 2) Opt for smart payment routing\n\nDynamic ",
+        "source_ref": "https://blog.cleeng.com/involuntary-churn-how-to-prevent-lost-revenue-from-failed-subscription-payments",
+        "node_id": "4032b7b9-8e31-4776-bbca-06e6bfcb4340",
+        "node_type": "hypothesis"
+      },
+      {
+        "evidence_id": "2ae07475-e535-49b2-a91e-f0ebcc7242f8",
+        "source_type": "search_signal",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-06T21:29:07.100Z",
+        "text_excerpt": "[Dunning Management Tips: Increase Revenue & Reduce Involuntary Churn] For eCommerce subscription brands, managing these issues effectively is essential in minimizing churn and lost revenue. Payment failure is a recurrent issue for e-commerce companies offering subscriptions which hampers their bott",
+        "source_ref": "https://www.loopwork.co/blog/dunning-management-tips",
+        "node_id": "4032b7b9-8e31-4776-bbca-06e6bfcb4340",
+        "node_type": "hypothesis"
+      },
+      {
+        "evidence_id": "48eeea86-69d7-4312-92d9-77d43859a0a9",
+        "source_type": "search_signal",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-07T06:19:37.524Z",
+        "text_excerpt": "[Churn Management Strategies To Reduce Subscriber Churn] recurly-logo\n\nProducts\n\nSolutions\n\nResources\n\nicon-cursor-box\n\nAugust 15, 2025\n\n# Churn management strategies to reduce and prevent subscriber churn\n\nMatthew Calhoun\n\nContent Marketing Writer\n\nTABLE OF CONTENTS\n\nTOPICS\n\nRELATED POSTS\n\nKey take",
+        "source_ref": "https://recurly.com/blog/strategies-to-reduce-and-prevent-subscriber-churn",
+        "node_id": "4032b7b9-8e31-4776-bbca-06e6bfcb4340",
+        "node_type": "hypothesis"
+      },
+      {
+        "evidence_id": "1326bda0-7358-4264-a658-f4bcfa0ebf23",
+        "source_type": "search_signal",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-07T06:19:37.524Z",
+        "text_excerpt": "[Dunning Management: The Complete Guide for SaaS (2026)] Dunning management targets involuntary churn caused by failed payments, while churn management broadly addresses all the reasons subscribers cancel or disengage.  \n    \n  The distinction matters because the fix for each is completely different",
+        "source_ref": "https://baremetrics.com/blog/dunning-management",
+        "node_id": "4032b7b9-8e31-4776-bbca-06e6bfcb4340",
+        "node_type": "hypothesis"
+      },
+      {
+        "evidence_id": "f6668367-6025-4045-bf19-84fb8ba2c469",
+        "source_type": "search_signal",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-07T06:19:37.524Z",
+        "text_excerpt": "[SaaS Dunning Management: How To Recover Failed Payments] ## Voluntary vs. Involuntary Churn\n\nVoluntary churn occurs when customers actively decide to unsubscribe from your service. Their reasons could include a bad experience, your service or product no longer meets their needs, they don’t feel the",
+        "source_ref": "https://blog.payproglobal.com/saas-dunning-management",
+        "node_id": "4032b7b9-8e31-4776-bbca-06e6bfcb4340",
+        "node_type": "hypothesis"
+      },
+      {
+        "evidence_id": "9d730186-6663-4a6b-8fef-71152b8ccc1f",
+        "source_type": "search_signal",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-07T06:19:37.524Z",
+        "text_excerpt": "[Manage Involuntary Churn with Loop’s Smart Dunning Management] Implementing robust dunning analytics to address this is crucial. By monitoring and analyzing payment failures, you can understand their impact on your revenue and develop strategies to mitigate them. A comprehensive dunning management ",
+        "source_ref": "https://www.loopwork.co/blog/manage-involuntary-churn-with-smart-dunning-management",
+        "node_id": "4032b7b9-8e31-4776-bbca-06e6bfcb4340",
+        "node_type": "hypothesis"
+      },
+      {
+        "evidence_id": "13395f58-a260-4d51-9006-30649c0e9dee",
+        "source_type": "search_signal",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-07T06:19:37.524Z",
+        "text_excerpt": "[What is Involuntary Churn & How to Prevent Lost Revenue from Failed Payments] For example, subscription payment solutions like Cleeng recover as much as 35% of failed renewal payments thanks to customer-tailored dunning strategies and local expertise.\n\n### 2) Opt for smart payment routing\n\nDynamic ",
+        "source_ref": "https://blog.cleeng.com/involuntary-churn-how-to-prevent-lost-revenue-from-failed-subscription-payments",
+        "node_id": "4032b7b9-8e31-4776-bbca-06e6bfcb4340",
+        "node_type": "hypothesis"
+      },
+      {
+        "evidence_id": "50761a2b-e95b-431c-b263-1efbe62d21d9",
+        "source_type": "search_signal",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-07T06:19:37.524Z",
+        "text_excerpt": "[Dunning Best Practices - Churn Buster] ### Wrapping Up:\n\nFailed payments can be a silent killer for your company, if you don’t handle them properly.\n\nWith the right dunning management, this avoidable issue can be effectively addressed, preserving your revenue. Churn Buster offers comprehensive tool",
+        "source_ref": "https://churnbuster.io/dunning-best-practices",
+        "node_id": "4032b7b9-8e31-4776-bbca-06e6bfcb4340",
+        "node_type": "hypothesis"
+      },
+      {
+        "evidence_id": "ff642e6f-5223-4068-8edb-2a745276d454",
+        "source_type": "search_signal",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-07T06:20:45.914Z",
+        "text_excerpt": "[Payment retries 101 - Stripe] #  is an important metric for businesses, especially those with subscription models. By preventing involuntary churn through payment retries, businesses can maintain long-term relationships with customers and maximize the revenue potential from each customer over time.",
+        "source_ref": "https://stripe.com/resources/more/payment-retries-101-how-businesses-can-make-the-most-of-this-important-detail",
+        "node_id": "4032b7b9-8e31-4776-bbca-06e6bfcb4340",
+        "node_type": "hypothesis"
+      },
+      {
+        "evidence_id": "56f2292d-02a4-4c7e-bb13-234c654a8778",
+        "source_type": "search_signal",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-07T06:20:45.914Z",
+        "text_excerpt": "[This Loop Subscriptions Cancellation Flow Saves Subscriptions (Here’s How)] customize the text, you can add videos. In this case, there is a video here\nthat's playing. I've made it so that you can't actually see the video because I\ndon't want to reveal uh the brand that we are working with,\nbut it ",
+        "source_ref": "https://www.youtube.com/watch?v=xbfYGnQp9VU",
+        "node_id": "4032b7b9-8e31-4776-bbca-06e6bfcb4340",
+        "node_type": "hypothesis"
+      },
+      {
+        "evidence_id": "40962395-2239-4480-b4b5-baf3bfa5a0b8",
+        "source_type": "review_complaint",
+        "evidence_polarity": "contradicting",
+        "timestamp": "2026-07-05T17:38:44.613Z",
+        "text_excerpt": "Shopify announced a related policy change effective May 4,\n2026: once a subscription is cancelled and the customer has no other\nactive subscriptions, their saved payment method is automatically\nrevoked. Merchants can reinstate the original payment method within a\n24-hour window if the cancellation w",
+        "source_ref": "manual-seed://shopify-payment-method-revocation-policy-may-2026",
+        "node_id": "4032b7b9-8e31-4776-bbca-06e6bfcb4340",
+        "node_type": "hypothesis"
+      },
+      {
+        "evidence_id": "fe991ccf-a812-4bb2-8762-34614d58528c",
+        "source_type": "competitor_material",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-05T18:19:38.886Z",
+        "text_excerpt": "Recharge's Shopify App Store listing states pricing tiers from\n$25 to $499+ per month, plus a transaction fee of 1.0-1.49% and $0.19\nper order. The listing describes Recharge as built for growing and\nenterprise subscription brands, with dunning and payment-recovery\ntooling included at every tier.",
+        "source_ref": "manual-seed://recharge-app-store-listing",
+        "node_id": "8dafe41b-ddbb-4a7d-a77f-da4fc12a8421",
+        "node_type": "business_model"
+      }
+    ]
+  },
+  {
+    "candidate_id": "54535c9a-c667-47d5-a7e1-40ff3839a22a",
+    "hypothesis_id": "13de4a40-6f82-49c3-b00c-21705105713f",
+    "opportunity_quality": 0.5275,
+    "founder_fit_score": 60,
+    "composition_rows": [
+      {
+        "field_name": "market",
+        "value": "cdb21181-53ce-4eff-83d0-49bab3cbb704",
+        "is_null": false,
+        "source_refs": [
+          {
+            "evidence_id": "bb77bb02-4ff6-4dc3-ac72-07809b6e29a0",
+            "evidence_polarity": "supporting"
+          },
+          {
+            "evidence_id": "274f4950-7c0e-41bd-a3f1-afb830ec1899",
+            "evidence_polarity": "supporting"
+          }
+        ]
+      },
+      {
+        "field_name": "audience",
+        "value": "83630a57-0fc3-4550-9929-a66750802599",
+        "is_null": false,
+        "source_refs": [
+          {
+            "evidence_id": "047730c0-d4b6-478a-99e5-611cb98a145a",
+            "evidence_polarity": "supporting"
+          },
+          {
+            "evidence_id": "87781ba9-7fbc-42f1-a15e-71cda7b1c460",
+            "evidence_polarity": "supporting"
+          },
+          {
+            "evidence_id": "40962395-2239-4480-b4b5-baf3bfa5a0b8",
+            "evidence_polarity": "supporting"
+          }
+        ]
+      },
+      {
+        "field_name": "problem",
+        "value": "173a0c23-e41d-4c32-af0c-d484c9add01a",
+        "is_null": false,
+        "source_refs": [
+          {
+            "evidence_id": "047730c0-d4b6-478a-99e5-611cb98a145a",
+            "evidence_polarity": "supporting"
+          },
+          {
+            "evidence_id": "87781ba9-7fbc-42f1-a15e-71cda7b1c460",
+            "evidence_polarity": "supporting"
+          }
+        ]
+      },
+      {
+        "field_name": "hypothesis",
+        "value": "13de4a40-6f82-49c3-b00c-21705105713f",
+        "is_null": false,
+        "source_refs": [
+          {
+            "evidence_id": "87781ba9-7fbc-42f1-a15e-71cda7b1c460",
+            "evidence_polarity": "supporting"
+          },
+          {
+            "evidence_id": "047730c0-d4b6-478a-99e5-611cb98a145a",
+            "evidence_polarity": "supporting"
+          },
+          {
+            "evidence_id": "4ddc58f8-a8c5-4340-9a45-72cc27056cc8",
+            "evidence_polarity": "supporting"
+          },
+          {
+            "evidence_id": "40962395-2239-4480-b4b5-baf3bfa5a0b8",
+            "evidence_polarity": "supporting"
+          },
+          {
+            "evidence_id": "4bb1d4b0-7597-4dd7-b4eb-0793d8277949",
+            "evidence_polarity": "supporting"
+          },
+          {
+            "evidence_id": "677a2e90-9f81-49b1-8207-2fe9fe93be09",
+            "evidence_polarity": "supporting"
+          },
+          {
+            "evidence_id": "ff063c90-7e9f-4d68-bdf6-4b0045f3710d",
+            "evidence_polarity": "supporting"
+          },
+          {
+            "evidence_id": "182bd9be-4f02-46f5-88ad-454a2d865646",
+            "evidence_polarity": "supporting"
+          },
+          {
+            "evidence_id": "b1edc615-9a89-45a4-b746-79e7215c83c4",
+            "evidence_polarity": "supporting"
+          },
+          {
+            "evidence_id": "2ae07475-e535-49b2-a91e-f0ebcc7242f8",
+            "evidence_polarity": "supporting"
+          },
+          {
+            "evidence_id": "1326bda0-7358-4264-a658-f4bcfa0ebf23",
+            "evidence_polarity": "supporting"
+          },
+          {
+            "evidence_id": "f6668367-6025-4045-bf19-84fb8ba2c469",
+            "evidence_polarity": "supporting"
+          },
+          {
+            "evidence_id": "96709341-1845-46dd-aae9-556bd1847d26",
+            "evidence_polarity": "supporting"
+          },
+          {
+            "evidence_id": "13395f58-a260-4d51-9006-30649c0e9dee",
+            "evidence_polarity": "supporting"
+          },
+          {
+            "evidence_id": "50761a2b-e95b-431c-b263-1efbe62d21d9",
+            "evidence_polarity": "supporting"
+          },
+          {
+            "evidence_id": "ff642e6f-5223-4068-8edb-2a745276d454",
+            "evidence_polarity": "supporting"
+          },
+          {
+            "evidence_id": "56f2292d-02a4-4c7e-bb13-234c654a8778",
+            "evidence_polarity": "supporting"
+          }
+        ]
+      },
+      {
+        "field_name": "business_model",
+        "value": "8dafe41b-ddbb-4a7d-a77f-da4fc12a8421",
+        "is_null": false,
+        "source_refs": [
+          {
+            "evidence_id": "fe991ccf-a812-4bb2-8762-34614d58528c",
+            "evidence_polarity": "supporting"
+          }
+        ]
+      }
+    ],
+    "linked_evidence": [
+      {
+        "evidence_id": "bb77bb02-4ff6-4dc3-ac72-07809b6e29a0",
+        "source_type": "marketplace",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-05T17:27:35.216Z",
+        "text_excerpt": "The Shopify App Store lists more than 20 subscription and recurring-order apps as of mid-2026, spanning flat-fee tools (Bold Subscriptions at $49.99/mo), free-tier options (native Shopify Subscriptions, Loop's free tier, Seal's free tier), and enterprise-oriented platforms charging $299-599/mo plus ",
+        "source_ref": "manual-seed://shopify-app-store-marketplace-overview",
+        "node_id": "cdb21181-53ce-4eff-83d0-49bab3cbb704",
+        "node_type": "market"
+      },
+      {
+        "evidence_id": "274f4950-7c0e-41bd-a3f1-afb830ec1899",
+        "source_type": "financial_signal",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-05T17:27:35.216Z",
+        "text_excerpt": "In April 2026, Recharge acquired competitor Skio for $105 million, consolidating two of the largest players in the Shopify subscription-app market. Skio's Shopify App Store listing showed 240+ reviews and a 5.0-star rating prior to the acquisition.",
+        "source_ref": "manual-seed://recharge-skio-acquisition-april-2026",
+        "node_id": "cdb21181-53ce-4eff-83d0-49bab3cbb704",
+        "node_type": "market"
+      },
+      {
+        "evidence_id": "047730c0-d4b6-478a-99e5-611cb98a145a",
+        "source_type": "review_complaint",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-05T17:38:44.613Z",
+        "text_excerpt": "A merchant posted on the Shopify Community forum describing\npersistent frustration with Shop Pay's handling of subscriptions: when\na customer's card on file expires, updating it is unusually difficult\ncompared to other checkout flows, and Shopify's own support could not\nresolve it after months. The ",
+        "source_ref": "manual-seed://shopify-community-shop-pay-subscription-issues",
+        "node_id": "83630a57-0fc3-4550-9929-a66750802599",
+        "node_type": "audience"
+      },
+      {
+        "evidence_id": "87781ba9-7fbc-42f1-a15e-71cda7b1c460",
+        "source_type": "review_complaint",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-05T17:38:44.613Z",
+        "text_excerpt": "Industry reporting (Shopifreaks) confirmed Shopify quietly\npatched a bug where removing a payment card from Shop Pay caused every\nactive subscription tied to that card to be cancelled automatically,\nacross every merchant on the platform, with no warning to merchants\nand no signal that the customer i",
+        "source_ref": "manual-seed://shopifreaks-shop-pay-silent-cancellation-bug",
+        "node_id": "83630a57-0fc3-4550-9929-a66750802599",
+        "node_type": "audience"
+      },
+      {
+        "evidence_id": "40962395-2239-4480-b4b5-baf3bfa5a0b8",
+        "source_type": "review_complaint",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-05T17:38:44.613Z",
+        "text_excerpt": "Shopify announced a related policy change effective May 4,\n2026: once a subscription is cancelled and the customer has no other\nactive subscriptions, their saved payment method is automatically\nrevoked. Merchants can reinstate the original payment method within a\n24-hour window if the cancellation w",
+        "source_ref": "manual-seed://shopify-payment-method-revocation-policy-may-2026",
+        "node_id": "83630a57-0fc3-4550-9929-a66750802599",
+        "node_type": "audience"
+      },
+      {
+        "evidence_id": "047730c0-d4b6-478a-99e5-611cb98a145a",
+        "source_type": "review_complaint",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-05T17:38:44.613Z",
+        "text_excerpt": "A merchant posted on the Shopify Community forum describing\npersistent frustration with Shop Pay's handling of subscriptions: when\na customer's card on file expires, updating it is unusually difficult\ncompared to other checkout flows, and Shopify's own support could not\nresolve it after months. The ",
+        "source_ref": "manual-seed://shopify-community-shop-pay-subscription-issues",
+        "node_id": "173a0c23-e41d-4c32-af0c-d484c9add01a",
+        "node_type": "problem"
+      },
+      {
+        "evidence_id": "87781ba9-7fbc-42f1-a15e-71cda7b1c460",
+        "source_type": "review_complaint",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-05T17:38:44.613Z",
+        "text_excerpt": "Industry reporting (Shopifreaks) confirmed Shopify quietly\npatched a bug where removing a payment card from Shop Pay caused every\nactive subscription tied to that card to be cancelled automatically,\nacross every merchant on the platform, with no warning to merchants\nand no signal that the customer i",
+        "source_ref": "manual-seed://shopifreaks-shop-pay-silent-cancellation-bug",
+        "node_id": "173a0c23-e41d-4c32-af0c-d484c9add01a",
+        "node_type": "problem"
+      },
+      {
+        "evidence_id": "87781ba9-7fbc-42f1-a15e-71cda7b1c460",
+        "source_type": "review_complaint",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-05T17:38:44.613Z",
+        "text_excerpt": "Industry reporting (Shopifreaks) confirmed Shopify quietly\npatched a bug where removing a payment card from Shop Pay caused every\nactive subscription tied to that card to be cancelled automatically,\nacross every merchant on the platform, with no warning to merchants\nand no signal that the customer i",
+        "source_ref": "manual-seed://shopifreaks-shop-pay-silent-cancellation-bug",
+        "node_id": "13de4a40-6f82-49c3-b00c-21705105713f",
+        "node_type": "hypothesis"
+      },
+      {
+        "evidence_id": "047730c0-d4b6-478a-99e5-611cb98a145a",
+        "source_type": "review_complaint",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-05T17:38:44.613Z",
+        "text_excerpt": "A merchant posted on the Shopify Community forum describing\npersistent frustration with Shop Pay's handling of subscriptions: when\na customer's card on file expires, updating it is unusually difficult\ncompared to other checkout flows, and Shopify's own support could not\nresolve it after months. The ",
+        "source_ref": "manual-seed://shopify-community-shop-pay-subscription-issues",
+        "node_id": "13de4a40-6f82-49c3-b00c-21705105713f",
+        "node_type": "hypothesis"
+      },
+      {
+        "evidence_id": "4ddc58f8-a8c5-4340-9a45-72cc27056cc8",
+        "source_type": "industry_report",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-05T17:27:35.216Z",
+        "text_excerpt": "Industry analysis of Shopify subscription commerce reports average monthly churn near 5%, compounding to roughly 46% annual churn if unaddressed. Analysts explicitly distinguish voluntary churn (a customer choosing to cancel) from involuntary churn (failed payments, forced platform-side cancellation",
+        "source_ref": "manual-seed://subscription-churn-industry-analysis",
+        "node_id": "13de4a40-6f82-49c3-b00c-21705105713f",
+        "node_type": "hypothesis"
+      },
+      {
+        "evidence_id": "40962395-2239-4480-b4b5-baf3bfa5a0b8",
+        "source_type": "review_complaint",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-05T17:38:44.613Z",
+        "text_excerpt": "Shopify announced a related policy change effective May 4,\n2026: once a subscription is cancelled and the customer has no other\nactive subscriptions, their saved payment method is automatically\nrevoked. Merchants can reinstate the original payment method within a\n24-hour window if the cancellation w",
+        "source_ref": "manual-seed://shopify-payment-method-revocation-policy-may-2026",
+        "node_id": "13de4a40-6f82-49c3-b00c-21705105713f",
+        "node_type": "hypothesis"
+      },
+      {
+        "evidence_id": "4bb1d4b0-7597-4dd7-b4eb-0793d8277949",
+        "source_type": "search_signal",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-06T21:29:07.100Z",
+        "text_excerpt": "[Churn Management Strategies To Reduce Subscriber Churn] recurly-logo\n\nProducts\n\nSolutions\n\nResources\n\nicon-cursor-box\n\nAugust 15, 2025\n\n# Churn management strategies to reduce and prevent subscriber churn\n\nMatthew Calhoun\n\nContent Marketing Writer\n\nTABLE OF CONTENTS\n\nTOPICS\n\nRELATED POSTS\n\nKey take",
+        "source_ref": "https://recurly.com/blog/strategies-to-reduce-and-prevent-subscriber-churn",
+        "node_id": "13de4a40-6f82-49c3-b00c-21705105713f",
+        "node_type": "hypothesis"
+      },
+      {
+        "evidence_id": "677a2e90-9f81-49b1-8207-2fe9fe93be09",
+        "source_type": "search_signal",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-06T21:29:07.100Z",
+        "text_excerpt": "[Prevent Passive Churn With Automated Recharge Dunning Features | Recharge] To tackle active churn, understand the reasons customers cancel their subscriptions and make moves to address those concerns. Passive churn, on the other hand, is oftentimes involuntary and unintentional, making it more diff",
+        "source_ref": "https://getrecharge.com/blog/prevent-passive-churn-with-automated-recharge-dunning-features",
+        "node_id": "13de4a40-6f82-49c3-b00c-21705105713f",
+        "node_type": "hypothesis"
+      },
+      {
+        "evidence_id": "ff063c90-7e9f-4d68-bdf6-4b0045f3710d",
+        "source_type": "search_signal",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-06T21:29:07.100Z",
+        "text_excerpt": "[Cancellation & Dunning Management in Subscriptions for Shopify Checkout • Support] Cancellation management settings let you control the process your customers must follow to cancel their subscriptions within the customer portal. You can also configure customer retention actions to present targeted ",
+        "source_ref": "https://support.boldcommerce.com/boldsubscriptions/cancellation-dunning-management-in-subscriptions-f",
+        "node_id": "13de4a40-6f82-49c3-b00c-21705105713f",
+        "node_type": "hypothesis"
+      },
+      {
+        "evidence_id": "182bd9be-4f02-46f5-88ad-454a2d865646",
+        "source_type": "search_signal",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-06T21:29:07.100Z",
+        "text_excerpt": "[Defined: What Is Dunning Management? (And Why It Isn't Just Collections) - Zuora] Day 15+: The subscription status changes. This might trigger a “service degradation” (limiting features) or a full “service suspension” until payment is received.\n\n## Strategies to reduce involuntary churn\n\nInvoluntar",
+        "source_ref": "https://www.zuora.com/glossary/dunning-management",
+        "node_id": "13de4a40-6f82-49c3-b00c-21705105713f",
+        "node_type": "hypothesis"
+      },
+      {
+        "evidence_id": "b1edc615-9a89-45a4-b746-79e7215c83c4",
+        "source_type": "search_signal",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-06T21:29:07.100Z",
+        "text_excerpt": "[What is Involuntary Churn & How to Prevent Lost Revenue from Failed Payments] For example, subscription payment solutions like Cleeng recover as much as 35% of failed renewal payments thanks to customer-tailored dunning strategies and local expertise.\n\n### 2) Opt for smart payment routing\n\nDynamic ",
+        "source_ref": "https://blog.cleeng.com/involuntary-churn-how-to-prevent-lost-revenue-from-failed-subscription-payments",
+        "node_id": "13de4a40-6f82-49c3-b00c-21705105713f",
+        "node_type": "hypothesis"
+      },
+      {
+        "evidence_id": "2ae07475-e535-49b2-a91e-f0ebcc7242f8",
+        "source_type": "search_signal",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-06T21:29:07.100Z",
+        "text_excerpt": "[Dunning Management Tips: Increase Revenue & Reduce Involuntary Churn] For eCommerce subscription brands, managing these issues effectively is essential in minimizing churn and lost revenue. Payment failure is a recurrent issue for e-commerce companies offering subscriptions which hampers their bott",
+        "source_ref": "https://www.loopwork.co/blog/dunning-management-tips",
+        "node_id": "13de4a40-6f82-49c3-b00c-21705105713f",
+        "node_type": "hypothesis"
+      },
+      {
+        "evidence_id": "1326bda0-7358-4264-a658-f4bcfa0ebf23",
+        "source_type": "search_signal",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-07T06:19:37.524Z",
+        "text_excerpt": "[Dunning Management: The Complete Guide for SaaS (2026)] Dunning management targets involuntary churn caused by failed payments, while churn management broadly addresses all the reasons subscribers cancel or disengage.  \n    \n  The distinction matters because the fix for each is completely different",
+        "source_ref": "https://baremetrics.com/blog/dunning-management",
+        "node_id": "13de4a40-6f82-49c3-b00c-21705105713f",
+        "node_type": "hypothesis"
+      },
+      {
+        "evidence_id": "f6668367-6025-4045-bf19-84fb8ba2c469",
+        "source_type": "search_signal",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-07T06:19:37.524Z",
+        "text_excerpt": "[SaaS Dunning Management: How To Recover Failed Payments] ## Voluntary vs. Involuntary Churn\n\nVoluntary churn occurs when customers actively decide to unsubscribe from your service. Their reasons could include a bad experience, your service or product no longer meets their needs, they don’t feel the",
+        "source_ref": "https://blog.payproglobal.com/saas-dunning-management",
+        "node_id": "13de4a40-6f82-49c3-b00c-21705105713f",
+        "node_type": "hypothesis"
+      },
+      {
+        "evidence_id": "96709341-1845-46dd-aae9-556bd1847d26",
+        "source_type": "search_signal",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-07T06:19:37.524Z",
+        "text_excerpt": "[Defined: What Is Dunning Management? (And Why It Isn't Just Collections) - Zuora] Day 15+: The subscription status changes. This might trigger a “service degradation” (limiting features) or a full “service suspension” until payment is received.\n\n## Strategies to reduce involuntary churn\n\nInvoluntar",
+        "source_ref": "https://www.zuora.com/glossary/dunning-management",
+        "node_id": "13de4a40-6f82-49c3-b00c-21705105713f",
+        "node_type": "hypothesis"
+      },
+      {
+        "evidence_id": "13395f58-a260-4d51-9006-30649c0e9dee",
+        "source_type": "search_signal",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-07T06:19:37.524Z",
+        "text_excerpt": "[What is Involuntary Churn & How to Prevent Lost Revenue from Failed Payments] For example, subscription payment solutions like Cleeng recover as much as 35% of failed renewal payments thanks to customer-tailored dunning strategies and local expertise.\n\n### 2) Opt for smart payment routing\n\nDynamic ",
+        "source_ref": "https://blog.cleeng.com/involuntary-churn-how-to-prevent-lost-revenue-from-failed-subscription-payments",
+        "node_id": "13de4a40-6f82-49c3-b00c-21705105713f",
+        "node_type": "hypothesis"
+      },
+      {
+        "evidence_id": "50761a2b-e95b-431c-b263-1efbe62d21d9",
+        "source_type": "search_signal",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-07T06:19:37.524Z",
+        "text_excerpt": "[Dunning Best Practices - Churn Buster] ### Wrapping Up:\n\nFailed payments can be a silent killer for your company, if you don’t handle them properly.\n\nWith the right dunning management, this avoidable issue can be effectively addressed, preserving your revenue. Churn Buster offers comprehensive tool",
+        "source_ref": "https://churnbuster.io/dunning-best-practices",
+        "node_id": "13de4a40-6f82-49c3-b00c-21705105713f",
+        "node_type": "hypothesis"
+      },
+      {
+        "evidence_id": "ff642e6f-5223-4068-8edb-2a745276d454",
+        "source_type": "search_signal",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-07T06:20:45.914Z",
+        "text_excerpt": "[Payment retries 101 - Stripe] #  is an important metric for businesses, especially those with subscription models. By preventing involuntary churn through payment retries, businesses can maintain long-term relationships with customers and maximize the revenue potential from each customer over time.",
+        "source_ref": "https://stripe.com/resources/more/payment-retries-101-how-businesses-can-make-the-most-of-this-important-detail",
+        "node_id": "13de4a40-6f82-49c3-b00c-21705105713f",
+        "node_type": "hypothesis"
+      },
+      {
+        "evidence_id": "56f2292d-02a4-4c7e-bb13-234c654a8778",
+        "source_type": "search_signal",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-07T06:20:45.914Z",
+        "text_excerpt": "[This Loop Subscriptions Cancellation Flow Saves Subscriptions (Here’s How)] customize the text, you can add videos. In this case, there is a video here\nthat's playing. I've made it so that you can't actually see the video because I\ndon't want to reveal uh the brand that we are working with,\nbut it ",
+        "source_ref": "https://www.youtube.com/watch?v=xbfYGnQp9VU",
+        "node_id": "13de4a40-6f82-49c3-b00c-21705105713f",
+        "node_type": "hypothesis"
+      },
+      {
+        "evidence_id": "fe991ccf-a812-4bb2-8762-34614d58528c",
+        "source_type": "competitor_material",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-05T18:19:38.886Z",
+        "text_excerpt": "Recharge's Shopify App Store listing states pricing tiers from\n$25 to $499+ per month, plus a transaction fee of 1.0-1.49% and $0.19\nper order. The listing describes Recharge as built for growing and\nenterprise subscription brands, with dunning and payment-recovery\ntooling included at every tier.",
+        "source_ref": "manual-seed://recharge-app-store-listing",
+        "node_id": "8dafe41b-ddbb-4a7d-a77f-da4fc12a8421",
+        "node_type": "business_model"
+      }
+    ]
+  },
+  {
+    "candidate_id": "fab5d955-b1b7-4d5c-9b61-8ab25e76c53b",
+    "hypothesis_id": "0aee3433-d97b-426e-ad80-ee5aee7e6288",
+    "opportunity_quality": 0.5175,
+    "founder_fit_score": 60,
+    "composition_rows": [
+      {
+        "field_name": "market",
+        "value": "cdb21181-53ce-4eff-83d0-49bab3cbb704",
+        "is_null": false,
+        "source_refs": [
+          {
+            "evidence_id": "bb77bb02-4ff6-4dc3-ac72-07809b6e29a0",
+            "evidence_polarity": "supporting"
+          },
+          {
+            "evidence_id": "274f4950-7c0e-41bd-a3f1-afb830ec1899",
+            "evidence_polarity": "supporting"
+          }
+        ]
+      },
+      {
+        "field_name": "audience",
+        "value": "83630a57-0fc3-4550-9929-a66750802599",
+        "is_null": false,
+        "source_refs": [
+          {
+            "evidence_id": "047730c0-d4b6-478a-99e5-611cb98a145a",
+            "evidence_polarity": "supporting"
+          },
+          {
+            "evidence_id": "87781ba9-7fbc-42f1-a15e-71cda7b1c460",
+            "evidence_polarity": "supporting"
+          },
+          {
+            "evidence_id": "40962395-2239-4480-b4b5-baf3bfa5a0b8",
+            "evidence_polarity": "supporting"
+          }
+        ]
+      },
+      {
+        "field_name": "problem",
+        "value": "173a0c23-e41d-4c32-af0c-d484c9add01a",
+        "is_null": false,
+        "source_refs": [
+          {
+            "evidence_id": "047730c0-d4b6-478a-99e5-611cb98a145a",
+            "evidence_polarity": "supporting"
+          },
+          {
+            "evidence_id": "87781ba9-7fbc-42f1-a15e-71cda7b1c460",
+            "evidence_polarity": "supporting"
+          }
+        ]
+      },
+      {
+        "field_name": "hypothesis",
+        "value": "0aee3433-d97b-426e-ad80-ee5aee7e6288",
+        "is_null": false,
+        "source_refs": [
+          {
+            "evidence_id": "87781ba9-7fbc-42f1-a15e-71cda7b1c460",
+            "evidence_polarity": "supporting"
+          },
+          {
+            "evidence_id": "047730c0-d4b6-478a-99e5-611cb98a145a",
+            "evidence_polarity": "supporting"
+          },
+          {
+            "evidence_id": "4ddc58f8-a8c5-4340-9a45-72cc27056cc8",
+            "evidence_polarity": "supporting"
+          },
+          {
+            "evidence_id": "4bb1d4b0-7597-4dd7-b4eb-0793d8277949",
+            "evidence_polarity": "supporting"
+          },
+          {
+            "evidence_id": "677a2e90-9f81-49b1-8207-2fe9fe93be09",
+            "evidence_polarity": "supporting"
+          },
+          {
+            "evidence_id": "ff063c90-7e9f-4d68-bdf6-4b0045f3710d",
+            "evidence_polarity": "supporting"
+          },
+          {
+            "evidence_id": "182bd9be-4f02-46f5-88ad-454a2d865646",
+            "evidence_polarity": "supporting"
+          },
+          {
+            "evidence_id": "b1edc615-9a89-45a4-b746-79e7215c83c4",
+            "evidence_polarity": "supporting"
+          },
+          {
+            "evidence_id": "48eeea86-69d7-4312-92d9-77d43859a0a9",
+            "evidence_polarity": "supporting"
+          },
+          {
+            "evidence_id": "1326bda0-7358-4264-a658-f4bcfa0ebf23",
+            "evidence_polarity": "supporting"
+          },
+          {
+            "evidence_id": "f6668367-6025-4045-bf19-84fb8ba2c469",
+            "evidence_polarity": "supporting"
+          },
+          {
+            "evidence_id": "9d730186-6663-4a6b-8fef-71152b8ccc1f",
+            "evidence_polarity": "supporting"
+          },
+          {
+            "evidence_id": "13395f58-a260-4d51-9006-30649c0e9dee",
+            "evidence_polarity": "supporting"
+          },
+          {
+            "evidence_id": "50761a2b-e95b-431c-b263-1efbe62d21d9",
+            "evidence_polarity": "supporting"
+          },
+          {
+            "evidence_id": "ff642e6f-5223-4068-8edb-2a745276d454",
+            "evidence_polarity": "supporting"
+          },
+          {
+            "evidence_id": "56f2292d-02a4-4c7e-bb13-234c654a8778",
+            "evidence_polarity": "supporting"
+          },
+          {
+            "evidence_id": "40962395-2239-4480-b4b5-baf3bfa5a0b8",
+            "evidence_polarity": "contradicting"
+          }
+        ]
+      },
+      {
+        "field_name": "business_model",
+        "value": "8dafe41b-ddbb-4a7d-a77f-da4fc12a8421",
+        "is_null": false,
+        "source_refs": [
+          {
+            "evidence_id": "fe991ccf-a812-4bb2-8762-34614d58528c",
+            "evidence_polarity": "supporting"
+          }
+        ]
+      }
+    ],
+    "linked_evidence": [
+      {
+        "evidence_id": "bb77bb02-4ff6-4dc3-ac72-07809b6e29a0",
+        "source_type": "marketplace",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-05T17:27:35.216Z",
+        "text_excerpt": "The Shopify App Store lists more than 20 subscription and recurring-order apps as of mid-2026, spanning flat-fee tools (Bold Subscriptions at $49.99/mo), free-tier options (native Shopify Subscriptions, Loop's free tier, Seal's free tier), and enterprise-oriented platforms charging $299-599/mo plus ",
+        "source_ref": "manual-seed://shopify-app-store-marketplace-overview",
+        "node_id": "cdb21181-53ce-4eff-83d0-49bab3cbb704",
+        "node_type": "market"
+      },
+      {
+        "evidence_id": "274f4950-7c0e-41bd-a3f1-afb830ec1899",
+        "source_type": "financial_signal",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-05T17:27:35.216Z",
+        "text_excerpt": "In April 2026, Recharge acquired competitor Skio for $105 million, consolidating two of the largest players in the Shopify subscription-app market. Skio's Shopify App Store listing showed 240+ reviews and a 5.0-star rating prior to the acquisition.",
+        "source_ref": "manual-seed://recharge-skio-acquisition-april-2026",
+        "node_id": "cdb21181-53ce-4eff-83d0-49bab3cbb704",
+        "node_type": "market"
+      },
+      {
+        "evidence_id": "047730c0-d4b6-478a-99e5-611cb98a145a",
+        "source_type": "review_complaint",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-05T17:38:44.613Z",
+        "text_excerpt": "A merchant posted on the Shopify Community forum describing\npersistent frustration with Shop Pay's handling of subscriptions: when\na customer's card on file expires, updating it is unusually difficult\ncompared to other checkout flows, and Shopify's own support could not\nresolve it after months. The ",
+        "source_ref": "manual-seed://shopify-community-shop-pay-subscription-issues",
+        "node_id": "83630a57-0fc3-4550-9929-a66750802599",
+        "node_type": "audience"
+      },
+      {
+        "evidence_id": "87781ba9-7fbc-42f1-a15e-71cda7b1c460",
+        "source_type": "review_complaint",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-05T17:38:44.613Z",
+        "text_excerpt": "Industry reporting (Shopifreaks) confirmed Shopify quietly\npatched a bug where removing a payment card from Shop Pay caused every\nactive subscription tied to that card to be cancelled automatically,\nacross every merchant on the platform, with no warning to merchants\nand no signal that the customer i",
+        "source_ref": "manual-seed://shopifreaks-shop-pay-silent-cancellation-bug",
+        "node_id": "83630a57-0fc3-4550-9929-a66750802599",
+        "node_type": "audience"
+      },
+      {
+        "evidence_id": "40962395-2239-4480-b4b5-baf3bfa5a0b8",
+        "source_type": "review_complaint",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-05T17:38:44.613Z",
+        "text_excerpt": "Shopify announced a related policy change effective May 4,\n2026: once a subscription is cancelled and the customer has no other\nactive subscriptions, their saved payment method is automatically\nrevoked. Merchants can reinstate the original payment method within a\n24-hour window if the cancellation w",
+        "source_ref": "manual-seed://shopify-payment-method-revocation-policy-may-2026",
+        "node_id": "83630a57-0fc3-4550-9929-a66750802599",
+        "node_type": "audience"
+      },
+      {
+        "evidence_id": "047730c0-d4b6-478a-99e5-611cb98a145a",
+        "source_type": "review_complaint",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-05T17:38:44.613Z",
+        "text_excerpt": "A merchant posted on the Shopify Community forum describing\npersistent frustration with Shop Pay's handling of subscriptions: when\na customer's card on file expires, updating it is unusually difficult\ncompared to other checkout flows, and Shopify's own support could not\nresolve it after months. The ",
+        "source_ref": "manual-seed://shopify-community-shop-pay-subscription-issues",
+        "node_id": "173a0c23-e41d-4c32-af0c-d484c9add01a",
+        "node_type": "problem"
+      },
+      {
+        "evidence_id": "87781ba9-7fbc-42f1-a15e-71cda7b1c460",
+        "source_type": "review_complaint",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-05T17:38:44.613Z",
+        "text_excerpt": "Industry reporting (Shopifreaks) confirmed Shopify quietly\npatched a bug where removing a payment card from Shop Pay caused every\nactive subscription tied to that card to be cancelled automatically,\nacross every merchant on the platform, with no warning to merchants\nand no signal that the customer i",
+        "source_ref": "manual-seed://shopifreaks-shop-pay-silent-cancellation-bug",
+        "node_id": "173a0c23-e41d-4c32-af0c-d484c9add01a",
+        "node_type": "problem"
+      },
+      {
+        "evidence_id": "87781ba9-7fbc-42f1-a15e-71cda7b1c460",
+        "source_type": "review_complaint",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-05T17:38:44.613Z",
+        "text_excerpt": "Industry reporting (Shopifreaks) confirmed Shopify quietly\npatched a bug where removing a payment card from Shop Pay caused every\nactive subscription tied to that card to be cancelled automatically,\nacross every merchant on the platform, with no warning to merchants\nand no signal that the customer i",
+        "source_ref": "manual-seed://shopifreaks-shop-pay-silent-cancellation-bug",
+        "node_id": "0aee3433-d97b-426e-ad80-ee5aee7e6288",
+        "node_type": "hypothesis"
+      },
+      {
+        "evidence_id": "047730c0-d4b6-478a-99e5-611cb98a145a",
+        "source_type": "review_complaint",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-05T17:38:44.613Z",
+        "text_excerpt": "A merchant posted on the Shopify Community forum describing\npersistent frustration with Shop Pay's handling of subscriptions: when\na customer's card on file expires, updating it is unusually difficult\ncompared to other checkout flows, and Shopify's own support could not\nresolve it after months. The ",
+        "source_ref": "manual-seed://shopify-community-shop-pay-subscription-issues",
+        "node_id": "0aee3433-d97b-426e-ad80-ee5aee7e6288",
+        "node_type": "hypothesis"
+      },
+      {
+        "evidence_id": "4ddc58f8-a8c5-4340-9a45-72cc27056cc8",
+        "source_type": "industry_report",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-05T17:27:35.216Z",
+        "text_excerpt": "Industry analysis of Shopify subscription commerce reports average monthly churn near 5%, compounding to roughly 46% annual churn if unaddressed. Analysts explicitly distinguish voluntary churn (a customer choosing to cancel) from involuntary churn (failed payments, forced platform-side cancellation",
+        "source_ref": "manual-seed://subscription-churn-industry-analysis",
+        "node_id": "0aee3433-d97b-426e-ad80-ee5aee7e6288",
+        "node_type": "hypothesis"
+      },
+      {
+        "evidence_id": "4bb1d4b0-7597-4dd7-b4eb-0793d8277949",
+        "source_type": "search_signal",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-06T21:29:07.100Z",
+        "text_excerpt": "[Churn Management Strategies To Reduce Subscriber Churn] recurly-logo\n\nProducts\n\nSolutions\n\nResources\n\nicon-cursor-box\n\nAugust 15, 2025\n\n# Churn management strategies to reduce and prevent subscriber churn\n\nMatthew Calhoun\n\nContent Marketing Writer\n\nTABLE OF CONTENTS\n\nTOPICS\n\nRELATED POSTS\n\nKey take",
+        "source_ref": "https://recurly.com/blog/strategies-to-reduce-and-prevent-subscriber-churn",
+        "node_id": "0aee3433-d97b-426e-ad80-ee5aee7e6288",
+        "node_type": "hypothesis"
+      },
+      {
+        "evidence_id": "677a2e90-9f81-49b1-8207-2fe9fe93be09",
+        "source_type": "search_signal",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-06T21:29:07.100Z",
+        "text_excerpt": "[Prevent Passive Churn With Automated Recharge Dunning Features | Recharge] To tackle active churn, understand the reasons customers cancel their subscriptions and make moves to address those concerns. Passive churn, on the other hand, is oftentimes involuntary and unintentional, making it more diff",
+        "source_ref": "https://getrecharge.com/blog/prevent-passive-churn-with-automated-recharge-dunning-features",
+        "node_id": "0aee3433-d97b-426e-ad80-ee5aee7e6288",
+        "node_type": "hypothesis"
+      },
+      {
+        "evidence_id": "ff063c90-7e9f-4d68-bdf6-4b0045f3710d",
+        "source_type": "search_signal",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-06T21:29:07.100Z",
+        "text_excerpt": "[Cancellation & Dunning Management in Subscriptions for Shopify Checkout • Support] Cancellation management settings let you control the process your customers must follow to cancel their subscriptions within the customer portal. You can also configure customer retention actions to present targeted ",
+        "source_ref": "https://support.boldcommerce.com/boldsubscriptions/cancellation-dunning-management-in-subscriptions-f",
+        "node_id": "0aee3433-d97b-426e-ad80-ee5aee7e6288",
+        "node_type": "hypothesis"
+      },
+      {
+        "evidence_id": "182bd9be-4f02-46f5-88ad-454a2d865646",
+        "source_type": "search_signal",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-06T21:29:07.100Z",
+        "text_excerpt": "[Defined: What Is Dunning Management? (And Why It Isn't Just Collections) - Zuora] Day 15+: The subscription status changes. This might trigger a “service degradation” (limiting features) or a full “service suspension” until payment is received.\n\n## Strategies to reduce involuntary churn\n\nInvoluntar",
+        "source_ref": "https://www.zuora.com/glossary/dunning-management",
+        "node_id": "0aee3433-d97b-426e-ad80-ee5aee7e6288",
+        "node_type": "hypothesis"
+      },
+      {
+        "evidence_id": "b1edc615-9a89-45a4-b746-79e7215c83c4",
+        "source_type": "search_signal",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-06T21:29:07.100Z",
+        "text_excerpt": "[What is Involuntary Churn & How to Prevent Lost Revenue from Failed Payments] For example, subscription payment solutions like Cleeng recover as much as 35% of failed renewal payments thanks to customer-tailored dunning strategies and local expertise.\n\n### 2) Opt for smart payment routing\n\nDynamic ",
+        "source_ref": "https://blog.cleeng.com/involuntary-churn-how-to-prevent-lost-revenue-from-failed-subscription-payments",
+        "node_id": "0aee3433-d97b-426e-ad80-ee5aee7e6288",
+        "node_type": "hypothesis"
+      },
+      {
+        "evidence_id": "48eeea86-69d7-4312-92d9-77d43859a0a9",
+        "source_type": "search_signal",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-07T06:19:37.524Z",
+        "text_excerpt": "[Churn Management Strategies To Reduce Subscriber Churn] recurly-logo\n\nProducts\n\nSolutions\n\nResources\n\nicon-cursor-box\n\nAugust 15, 2025\n\n# Churn management strategies to reduce and prevent subscriber churn\n\nMatthew Calhoun\n\nContent Marketing Writer\n\nTABLE OF CONTENTS\n\nTOPICS\n\nRELATED POSTS\n\nKey take",
+        "source_ref": "https://recurly.com/blog/strategies-to-reduce-and-prevent-subscriber-churn",
+        "node_id": "0aee3433-d97b-426e-ad80-ee5aee7e6288",
+        "node_type": "hypothesis"
+      },
+      {
+        "evidence_id": "1326bda0-7358-4264-a658-f4bcfa0ebf23",
+        "source_type": "search_signal",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-07T06:19:37.524Z",
+        "text_excerpt": "[Dunning Management: The Complete Guide for SaaS (2026)] Dunning management targets involuntary churn caused by failed payments, while churn management broadly addresses all the reasons subscribers cancel or disengage.  \n    \n  The distinction matters because the fix for each is completely different",
+        "source_ref": "https://baremetrics.com/blog/dunning-management",
+        "node_id": "0aee3433-d97b-426e-ad80-ee5aee7e6288",
+        "node_type": "hypothesis"
+      },
+      {
+        "evidence_id": "f6668367-6025-4045-bf19-84fb8ba2c469",
+        "source_type": "search_signal",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-07T06:19:37.524Z",
+        "text_excerpt": "[SaaS Dunning Management: How To Recover Failed Payments] ## Voluntary vs. Involuntary Churn\n\nVoluntary churn occurs when customers actively decide to unsubscribe from your service. Their reasons could include a bad experience, your service or product no longer meets their needs, they don’t feel the",
+        "source_ref": "https://blog.payproglobal.com/saas-dunning-management",
+        "node_id": "0aee3433-d97b-426e-ad80-ee5aee7e6288",
+        "node_type": "hypothesis"
+      },
+      {
+        "evidence_id": "9d730186-6663-4a6b-8fef-71152b8ccc1f",
+        "source_type": "search_signal",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-07T06:19:37.524Z",
+        "text_excerpt": "[Manage Involuntary Churn with Loop’s Smart Dunning Management] Implementing robust dunning analytics to address this is crucial. By monitoring and analyzing payment failures, you can understand their impact on your revenue and develop strategies to mitigate them. A comprehensive dunning management ",
+        "source_ref": "https://www.loopwork.co/blog/manage-involuntary-churn-with-smart-dunning-management",
+        "node_id": "0aee3433-d97b-426e-ad80-ee5aee7e6288",
+        "node_type": "hypothesis"
+      },
+      {
+        "evidence_id": "13395f58-a260-4d51-9006-30649c0e9dee",
+        "source_type": "search_signal",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-07T06:19:37.524Z",
+        "text_excerpt": "[What is Involuntary Churn & How to Prevent Lost Revenue from Failed Payments] For example, subscription payment solutions like Cleeng recover as much as 35% of failed renewal payments thanks to customer-tailored dunning strategies and local expertise.\n\n### 2) Opt for smart payment routing\n\nDynamic ",
+        "source_ref": "https://blog.cleeng.com/involuntary-churn-how-to-prevent-lost-revenue-from-failed-subscription-payments",
+        "node_id": "0aee3433-d97b-426e-ad80-ee5aee7e6288",
+        "node_type": "hypothesis"
+      },
+      {
+        "evidence_id": "50761a2b-e95b-431c-b263-1efbe62d21d9",
+        "source_type": "search_signal",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-07T06:19:37.524Z",
+        "text_excerpt": "[Dunning Best Practices - Churn Buster] ### Wrapping Up:\n\nFailed payments can be a silent killer for your company, if you don’t handle them properly.\n\nWith the right dunning management, this avoidable issue can be effectively addressed, preserving your revenue. Churn Buster offers comprehensive tool",
+        "source_ref": "https://churnbuster.io/dunning-best-practices",
+        "node_id": "0aee3433-d97b-426e-ad80-ee5aee7e6288",
+        "node_type": "hypothesis"
+      },
+      {
+        "evidence_id": "ff642e6f-5223-4068-8edb-2a745276d454",
+        "source_type": "search_signal",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-07T06:20:45.914Z",
+        "text_excerpt": "[Payment retries 101 - Stripe] #  is an important metric for businesses, especially those with subscription models. By preventing involuntary churn through payment retries, businesses can maintain long-term relationships with customers and maximize the revenue potential from each customer over time.",
+        "source_ref": "https://stripe.com/resources/more/payment-retries-101-how-businesses-can-make-the-most-of-this-important-detail",
+        "node_id": "0aee3433-d97b-426e-ad80-ee5aee7e6288",
+        "node_type": "hypothesis"
+      },
+      {
+        "evidence_id": "56f2292d-02a4-4c7e-bb13-234c654a8778",
+        "source_type": "search_signal",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-07T06:20:45.914Z",
+        "text_excerpt": "[This Loop Subscriptions Cancellation Flow Saves Subscriptions (Here’s How)] customize the text, you can add videos. In this case, there is a video here\nthat's playing. I've made it so that you can't actually see the video because I\ndon't want to reveal uh the brand that we are working with,\nbut it ",
+        "source_ref": "https://www.youtube.com/watch?v=xbfYGnQp9VU",
+        "node_id": "0aee3433-d97b-426e-ad80-ee5aee7e6288",
+        "node_type": "hypothesis"
+      },
+      {
+        "evidence_id": "40962395-2239-4480-b4b5-baf3bfa5a0b8",
+        "source_type": "review_complaint",
+        "evidence_polarity": "contradicting",
+        "timestamp": "2026-07-05T17:38:44.613Z",
+        "text_excerpt": "Shopify announced a related policy change effective May 4,\n2026: once a subscription is cancelled and the customer has no other\nactive subscriptions, their saved payment method is automatically\nrevoked. Merchants can reinstate the original payment method within a\n24-hour window if the cancellation w",
+        "source_ref": "manual-seed://shopify-payment-method-revocation-policy-may-2026",
+        "node_id": "0aee3433-d97b-426e-ad80-ee5aee7e6288",
+        "node_type": "hypothesis"
+      },
+      {
+        "evidence_id": "fe991ccf-a812-4bb2-8762-34614d58528c",
+        "source_type": "competitor_material",
+        "evidence_polarity": "supporting",
+        "timestamp": "2026-07-05T18:19:38.886Z",
+        "text_excerpt": "Recharge's Shopify App Store listing states pricing tiers from\n$25 to $499+ per month, plus a transaction fee of 1.0-1.49% and $0.19\nper order. The listing describes Recharge as built for growing and\nenterprise subscription brands, with dunning and payment-recovery\ntooling included at every tier.",
+        "source_ref": "manual-seed://recharge-app-store-listing",
+        "node_id": "8dafe41b-ddbb-4a7d-a77f-da4fc12a8421",
+        "node_type": "business_model"
+      }
+    ]
+  }
+]

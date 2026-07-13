@@ -1,0 +1,421 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["partialIndexes"]
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Founder {
+  id                  String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  expertise           String[]
+  industries          String[]
+  geography           String?
+  capitalAvailability String?       @map("capital_availability")
+  distributionAssets  String[]      @map("distribution_assets")
+  audienceAssets      String[]      @map("audience_assets")
+  teamSize            Int?          @map("team_size")
+  constraints         String[]
+  // Per-field asked-tracking for the Intake Engine (migration 010).
+  // NULL = intake not started. Non-null = FounderIntakeState JSON blob.
+  // Typed as Json? so Prisma stores/retrieves JSONB without a join table.
+  intakeState         Json?         @map("intake_state")
+  authUserId          String?       @unique @map("auth_user_id") @db.Uuid
+  createdAt           DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  lastUpdatedAt       DateTime      @default(now()) @map("last_updated_at") @db.Timestamptz(6)
+  pipelineRuns        PipelineRun[]
+  founderEvidence     FounderEvidence[]
+
+  @@map("founder")
+}
+
+// One row per interview answer — append-only trail.
+// target_field matches FounderFit's source_field enum values directly.
+model FounderEvidence {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  founderId      String   @map("founder_id") @db.Uuid
+  targetField    String   @map("target_field")
+  questionAsked  String   @map("question_asked")
+  rawAnswer      String   @map("raw_answer")
+  extractedValue String   @map("extracted_value")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  founder        Founder  @relation(fields: [founderId], references: [id], onDelete: Cascade)
+
+  @@index([founderId, createdAt])
+  @@map("founder_evidence")
+}
+
+model PipelineRun {
+  runId                 String                 @id @default(dbgenerated("gen_random_uuid()")) @map("run_id") @db.Uuid
+  founderId             String                 @map("founder_id") @db.Uuid
+  vertical              String
+  currentStage          String                 @default("discovery") @map("current_stage")
+  status                String                 @default("running")
+  failureReason         String?                @map("failure_reason")
+  startedAt             DateTime               @default(now()) @map("started_at") @db.Timestamptz(6)
+  completedAt           DateTime?              @map("completed_at") @db.Timestamptz(6)
+  agentExecutionLogs    AgentExecutionLog[]
+  opportunityCandidates OpportunityCandidate[]
+  founder               Founder                @relation(fields: [founderId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  pipelineSearchLogs    PipelineSearchLog[]
+
+  @@map("pipeline_run")
+}
+
+model AgentExecutionLog {
+  id                 String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  runId              String?               @map("run_id") @db.Uuid
+  candidateId        String?               @map("candidate_id") @db.Uuid
+  agentName          String                @map("agent_name")
+  modelUsed          String?               @map("model_used")
+  inputHash          String?               @map("input_hash")
+  outputHash         String?               @map("output_hash")
+  startedAt          DateTime              @map("started_at") @db.Timestamptz(6)
+  completedAt        DateTime?             @map("completed_at") @db.Timestamptz(6)
+  status             String
+  attemptNumber      Int                   @default(1) @map("attempt_number")
+  costEstimate       Decimal?              @map("cost_estimate") @db.Decimal
+  graphMutationCount Int?                  @map("graph_mutation_count")
+  candidate          OpportunityCandidate? @relation(fields: [candidateId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  run                PipelineRun?          @relation(fields: [runId], references: [runId], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([runId, candidateId, agentName], map: "idx_execlog_run_candidate")
+  @@map("agent_execution_log")
+}
+
+model Evidence {
+  id                    String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sourceUrlOrIdentifier String          @map("source_url_or_identifier")
+  sourceType            String          @map("source_type")
+  sourceAuthorityTier   String          @map("source_authority_tier")
+  clusterId             String?         @map("cluster_id")
+  clusterVersion        Int?            @map("cluster_version")
+  extractionMethod      String          @map("extraction_method")
+  extractionConfidence  Float?          @map("extraction_confidence") @db.Real
+  extractedFact         String          @map("extracted_fact")
+  fetchedAt             DateTime        @map("fetched_at") @db.Timestamptz(6)
+  sourcePublishedAt     DateTime?       @map("source_published_at") @db.Timestamptz(6)
+  vertical              String?
+  freshness             Float?          @db.Real
+  verificationStatus    String          @default("unverified") @map("verification_status")
+  status                String          @default("active")
+  sourceRefs            NodeSourceRef[]
+
+  @@index([clusterId, clusterVersion], map: "idx_evidence_cluster")
+  @@map("evidence")
+}
+
+model Market {
+  id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  label              String?
+  marketSizeEstimate Decimal? @map("market_size_estimate") @db.Decimal
+  growthRateEstimate Float?   @map("growth_rate_estimate") @db.Real
+  maturityStage      String   @map("maturity_stage")
+  parentMarketId     String?  @map("parent_market_id") @db.Uuid
+  categoryTags       String[] @map("category_tags")
+  status             String   @default("active")
+  deprecationReason  String?  @map("deprecation_reason")
+  confidence         Float?   @db.Real
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  lastSeenAt         DateTime @default(now()) @map("last_seen_at") @db.Timestamptz(6)
+  pipelineRunId      String?  @map("pipeline_run_id") @db.Uuid
+  parentMarket       Market?  @relation("MarketHierarchy", fields: [parentMarketId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  childMarkets       Market[] @relation("MarketHierarchy")
+
+  @@index([id], map: "idx_market_active", where: raw("(status = 'active'::text)"))
+  @@map("market")
+}
+
+model Audience {
+  id                       String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  label                    String?
+  demographicProfile       Json?    @map("demographic_profile")
+  behavioralProfile        Json?    @map("behavioral_profile")
+  sizeEstimate             Decimal? @map("size_estimate") @db.Decimal
+  willingnessToPaySignal   Float?   @map("willingness_to_pay_signal") @db.Real
+  acquisitionChannelsKnown String[] @map("acquisition_channels_known")
+  status                   String   @default("active")
+  deprecationReason        String?  @map("deprecation_reason")
+  confidence               Float?   @db.Real
+  createdAt                DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  lastSeenAt               DateTime @default(now()) @map("last_seen_at") @db.Timestamptz(6)
+  pipelineRunId            String?  @map("pipeline_run_id") @db.Uuid
+
+  @@index([id], map: "idx_audience_active", where: raw("(status = 'active'::text)"))
+  @@map("audience")
+}
+
+model Problem {
+  id                           String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  label                        String?
+  severitySignal               Float?             @map("severity_signal") @db.Real
+  frequencySignal              Float?             @map("frequency_signal") @db.Real
+  currentWorkaroundDescription String?            @map("current_workaround_description")
+  problemMaturity              String             @map("problem_maturity")
+  status                       String             @default("active")
+  deprecationReason            String?            @map("deprecation_reason")
+  confidence                   Float?             @db.Real
+  createdAt                    DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  lastSeenAt                   DateTime           @default(now()) @map("last_seen_at") @db.Timestamptz(6)
+  pipelineRunId                String?            @map("pipeline_run_id") @db.Uuid
+  hypothesisSources            HypothesisSource[]
+
+  @@index([id], map: "idx_problem_active", where: raw("(status = 'active'::text)"))
+  @@map("problem")
+}
+
+model ExistingSolution {
+  id                                   String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  label                                String?
+  positioningSummary                   String?            @map("positioning_summary")
+  pricingModel                         Json?              @map("pricing_model")
+  estimatedMarketShare                 Float?             @map("estimated_market_share") @db.Real
+  strengths                            String[]
+  weaknesses                           String[]
+  distributionChannels                 String[]           @map("distribution_channels")
+  status                               String             @default("active")
+  deprecationReason                    String?            @map("deprecation_reason")
+  confidence                           Float?             @db.Real
+  createdAt                            DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  lastSeenAt                           DateTime           @default(now()) @map("last_seen_at") @db.Timestamptz(6)
+  pipelineRunId                        String?            @map("pipeline_run_id") @db.Uuid
+  positioningSummaryIsCompetitorStated Boolean?           @map("positioning_summary_is_competitor_stated")
+  hypothesisSources                    HypothesisSource[]
+
+  @@index([id], map: "idx_existing_solution_active", where: raw("(status = 'active'::text)"))
+  @@map("existing_solution")
+}
+
+model BusinessModel {
+  id                            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  label                         String?
+  modelType                     String   @map("model_type")
+  marginProfile                 Float?   @map("margin_profile") @db.Real
+  operationalComplexityEstimate Float?   @map("operational_complexity_estimate") @db.Real
+  capitalIntensityEstimate      Float?   @map("capital_intensity_estimate") @db.Real
+  status                        String   @default("active")
+  deprecationReason             String?  @map("deprecation_reason")
+  confidence                    Float?   @db.Real
+  createdAt                     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  lastSeenAt                    DateTime @default(now()) @map("last_seen_at") @db.Timestamptz(6)
+  pipelineRunId                 String?  @map("pipeline_run_id") @db.Uuid
+
+  @@index([id], map: "idx_business_model_active", where: raw("(status = 'active'::text)"))
+  @@map("business_model")
+}
+
+model Hypothesis {
+  id                                 String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  label                              String?
+  statement                          String
+  gapType                            String             @map("gap_type")
+  missingData                        String[]           @map("missing_data")
+  supportingEvidenceStrength         Float?             @map("supporting_evidence_strength") @db.Real
+  validationScore                    Float?             @map("validation_score") @db.Real
+  validationComputedAtClusterVersion Int?               @map("validation_computed_at_cluster_version")
+  status                             String             @default("active")
+  deprecationReason                  String?            @map("deprecation_reason")
+  confidence                         Float?             @db.Real
+  createdAt                          DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  lastSeenAt                         DateTime           @default(now()) @map("last_seen_at") @db.Timestamptz(6)
+  pipelineRunId                      String?            @map("pipeline_run_id") @db.Uuid
+  hypothesisSources                  HypothesisSource[]
+
+  @@index([id], map: "idx_hypothesis_active", where: raw("(status = 'active'::text)"))
+  @@map("hypothesis")
+}
+
+model NodeSourceRef {
+  nodeId           String   @map("node_id") @db.Uuid
+  nodeType         String   @map("node_type")
+  evidenceId       String   @map("evidence_id") @db.Uuid
+  evidencePolarity String   @default("supporting") @map("evidence_polarity")
+  evidence         Evidence @relation(fields: [evidenceId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@id([nodeId, evidenceId])
+  @@index([evidenceId], map: "idx_node_source_refs_evidence")
+  @@map("node_source_refs")
+}
+
+model OpportunityCandidate {
+  id                      String                            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  runId                   String                            @map("run_id") @db.Uuid
+  opportunityQuality      Float?                            @map("opportunity_quality") @db.Real
+  founderFitScore         Float?                            @map("founder_fit_score") @db.Real
+  founderFitRationale     String?                           @map("founder_fit_rationale")
+  ventureScore            Float?                            @map("venture_score") @db.Real
+  confidenceScore         Float?                            @map("confidence_score") @db.Real
+  /// Legacy — reserved by the round-1 Mode 2 design (fractional
+  /// coverage, per-slot-mean agreement, blended freshness). Never
+  /// written. Superseded by confidenceCoverageGate/
+  /// confidenceAgreement/confidenceFreshness in migration 005;
+  /// kept in schema for reversibility per the migration's header.
+  coverage                Float?                            @db.Real
+  /// Legacy — see `coverage` comment.
+  agreement               Float?                            @db.Real
+  /// Legacy — see `coverage` comment.
+  freshness               Float?                            @db.Real
+  confidenceCoverageGate  Boolean?                          @map("confidence_coverage_gate")
+  incompleteComposition   Boolean?                          @map("incomplete_composition")
+  confidenceAgreement     Float?                            @map("confidence_agreement") @db.Real
+  confidenceFreshness     Float?                            @map("confidence_freshness") @db.Real
+  status                  String                            @default("candidate")
+  deprecationReason       String?                           @map("deprecation_reason")
+  createdAt               DateTime                          @default(now()) @map("created_at") @db.Timestamptz(6)
+  lastSeenAt              DateTime                          @default(now()) @map("last_seen_at") @db.Timestamptz(6)
+  agentExecutionLogs      AgentExecutionLog[]
+  promotedOpportunity     Opportunity?
+  run                     PipelineRun                       @relation(fields: [runId], references: [runId], onDelete: NoAction, onUpdate: NoAction)
+  composition             OpportunityCandidateComposition[]
+
+  @@index([runId, status], map: "idx_opportunity_candidate_run")
+  @@map("opportunity_candidate")
+}
+
+model OpportunityCandidateComposition {
+  candidateId String               @map("candidate_id") @db.Uuid
+  nodeId      String               @map("node_id") @db.Uuid
+  nodeType    String               @map("node_type")
+  role        String
+  candidate   OpportunityCandidate @relation(fields: [candidateId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@id([candidateId, role])
+  @@map("opportunity_candidate_composition")
+}
+
+/// existing_solution_id is genuinely nullable (absence-of-solution
+/// citation). Cannot be part of a composite @@id in Prisma (nullable
+/// fields aren't allowed in a primary key) — uses a surrogate id
+/// instead, matching the fix applied to 001_initial_schema.sql after
+/// this was caught by Postgres itself coercing it to NOT NULL when it
+/// was originally part of the PK. Two partial unique indexes (DB-level
+/// only, not expressible in this file) enforce no-duplicates for both
+/// the with-solution and without-solution cases — see the migration.
+model HypothesisSource {
+  id                 String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  hypothesisId       String            @map("hypothesis_id") @db.Uuid
+  problemId          String            @map("problem_id") @db.Uuid
+  existingSolutionId String?           @map("existing_solution_id") @db.Uuid
+  existingSolution   ExistingSolution? @relation(fields: [existingSolutionId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  hypothesis         Hypothesis        @relation(fields: [hypothesisId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  problem            Problem           @relation(fields: [problemId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([hypothesisId, problemId, existingSolutionId], map: "idx_hypothesis_sources_with_solution", where: raw("(existing_solution_id IS NOT NULL)"))
+  @@unique([hypothesisId, problemId], map: "idx_hypothesis_sources_without_solution", where: raw("(existing_solution_id IS NULL)"))
+  @@map("hypothesis_sources")
+}
+
+model Opportunity {
+  id                      String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  promotedFromCandidateId String               @unique @map("promoted_from_candidate_id") @db.Uuid
+  ventureScore            Float                @map("venture_score") @db.Real
+  confidenceScore         Float                @map("confidence_score") @db.Real
+  founderFitScore         Float                @map("founder_fit_score") @db.Real
+  founderFitRationale     String?              @map("founder_fit_rationale")
+  rationaleBullets        String[]             @map("rationale_bullets")
+  riskSummary             String[]             @map("risk_summary")
+  status                  String               @default("active")
+  createdAt               DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  promotedFromCandidate   OpportunityCandidate @relation(fields: [promotedFromCandidateId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  outcomes                Outcome[]
+
+  @@index([id], map: "idx_opportunity_active", where: raw("(status = 'active'::text)"))
+  @@map("opportunity")
+}
+
+/// Append-only at the DB level via trg_outcome_no_update — this Prisma
+/// model has no update/delete safety of its own; application code
+/// MUST only ever call `create`, never `update`/`delete`, on this
+/// model. The trigger is the real guarantee; this comment is not.
+model Outcome {
+  id             String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  opportunityId  String      @map("opportunity_id") @db.Uuid
+  signalType     String      @map("signal_type")
+  signalStrength String      @map("signal_strength")
+  reasonTag      String?     @map("reason_tag")
+  reportedAt     DateTime    @default(now()) @map("reported_at") @db.Timestamptz(6)
+  confidence     Float?      @db.Real
+  opportunity    Opportunity @relation(fields: [opportunityId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@map("outcome")
+}
+
+model Edge {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  edgeType   String   @map("edge_type")
+  fromId     String   @unique(map: "idx_promotes_once", where: raw("(edge_type = 'promotes'::text)")) @map("from_id") @db.Uuid
+  fromType   String   @map("from_type")
+  toId       String   @map("to_id") @db.Uuid
+  toType     String   @map("to_type")
+  confidence Float?   @db.Real
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([fromId, edgeType], map: "idx_edge_from")
+  @@index([toId, edgeType], map: "idx_edge_to")
+  @@map("edge")
+}
+
+model ScoringConfig {
+  version          Int
+  vertical         String
+  w1Demand         Float    @map("w1_demand") @db.Real
+  w2Hypothesis     Float    @map("w2_hypothesis") @db.Real
+  w3Margin         Float    @map("w3_margin") @db.Real
+  w4Feasibility    Float    @map("w4_feasibility") @db.Real
+  w5Distribution   Float    @map("w5_distribution") @db.Real
+  w6Timing         Float    @map("w6_timing") @db.Real
+  qualityWeight    Float    @default(0.7) @map("quality_weight") @db.Real
+  founderFitWeight Float    @default(0.3) @map("founder_fit_weight") @db.Real
+  effectiveFrom    DateTime @default(now()) @map("effective_from") @db.Timestamptz(6)
+
+  @@id([version, vertical])
+  @@map("scoring_config")
+}
+
+model ModelRoutingConfig {
+  version       Int
+  agentName     String   @map("agent_name")
+  nimModelId    String   @map("nim_model_id")
+  tier          String
+  effectiveFrom DateTime @default(now()) @map("effective_from") @db.Timestamptz(6)
+
+  @@id([version, agentName])
+  @@map("model_routing_config")
+}
+
+model PipelineSearchLog {
+  id           String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  runId        String      @map("run_id") @db.Uuid
+  hypothesisId String?     @map("hypothesis_id") @db.Uuid
+  connector    String
+  queryText    String      @map("query_text")
+  resultCount  Int         @map("result_count")
+  executedAt   DateTime    @default(now()) @map("executed_at") @db.Timestamptz(6)
+  run          PipelineRun @relation(fields: [runId], references: [runId], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([runId, hypothesisId], map: "idx_pipeline_search_log_run")
+  @@map("pipeline_search_log")
+}
+
+// Phase 6 Orchestrator checkpoint. Source of truth for DAG progress;
+// BullMQ handles execution but this table decides whether a job
+// (re-)runs. See migration 006_dag_run_state.sql for column semantics.
+model DagRunState {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  runId         String    @map("run_id") @db.Uuid
+  hypothesisId  String?   @map("hypothesis_id") @db.Uuid
+  candidateId   String?   @map("candidate_id") @db.Uuid
+  step          String
+  status        String    @default("pending")
+  attemptCount  Int       @default(0) @map("attempt_count")
+  lastError     String?   @map("last_error")
+  startedAt     DateTime? @map("started_at") @db.Timestamptz(6)
+  completedAt   DateTime? @map("completed_at") @db.Timestamptz(6)
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([runId, step], map: "dag_run_state_run_step_unique")
+  @@index([runId], map: "idx_dag_run_state_run_id")
+  @@map("dag_run_state")
+}

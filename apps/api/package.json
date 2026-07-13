@@ -1,0 +1,43 @@
+{
+  "name": "api",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev": "tsx watch -r dotenv/config src/scripts/runOrchestratorServer.ts",
+    "start": "tsx -r dotenv/config src/scripts/runOrchestratorServer.ts",
+    "test": "vitest run"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@mozilla/readability": "^0.6.0",
+    "@prisma/adapter-pg": "^7.8.0",
+    "@prisma/client": "^7.8.0",
+    "@supabase/supabase-js": "^2.110.2",
+    "@types/express": "^5.0.6",
+    "bullmq": "^5.79.3",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "ioredis": "^5.11.1",
+    "jsdom": "^29.1.1",
+    "jsonrepair": "^3.15.0",
+    "pg": "^8.22.0",
+    "prisma": "^7.8.0",
+    "turndown": "^7.2.4",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/jsdom": "^28.0.3",
+    "@types/node": "^26.1.0",
+    "@types/pg": "^8.20.0",
+    "@types/turndown": "^5.0.6",
+    "tsx": "^4.23.0",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.10"
+  }
+}

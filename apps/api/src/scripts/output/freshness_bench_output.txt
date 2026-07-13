@@ -1,0 +1,77 @@
+Freshness bench @ 2026-07-07T16:09:09.656Z
+Formula: freshness = 1 / (1 + max(0, age_days) / DECAY)
+Current DECAY_CONSTANT_DAYS = 90
+
+--- Part A: freshness_per_evidence on real corpus (n=38) ---
+evidence_id,age_days,freshness_score,source_type,source_ref
+bb77bb02-4ff6-4dc3-ac72-07809b6e29a0,1.9455,0.978840,marketplace,manual-seed://shopify-app-store-marketplace-overview
+274f4950-7c0e-41bd-a3f1-afb830ec1899,1.9455,0.978840,financial_signal,manual-seed://recharge-skio-acquisition-april-2026
+4ddc58f8-a8c5-4340-9a45-72cc27056cc8,1.9455,0.978840,industry_report,manual-seed://subscription-churn-industry-analysis
+047730c0-d4b6-478a-99e5-611cb98a145a,1.9378,0.978923,review_complaint,manual-seed://shopify-community-shop-pay-subscription-issues
+87781ba9-7fbc-42f1-a15e-71cda7b1c460,1.9378,0.978923,review_complaint,manual-seed://shopifreaks-shop-pay-silent-cancellation-bug
+40962395-2239-4480-b4b5-baf3bfa5a0b8,1.9378,0.978923,review_complaint,manual-seed://shopify-payment-method-revocation-policy-may-2026
+fe991ccf-a812-4bb2-8762-34614d58528c,1.9094,0.979225,competitor_material,manual-seed://recharge-app-store-listing
+40044b8c-9803-441a-9da1-3534365ccd13,1.9094,0.979225,competitor_material,manual-seed://loop-subscriptions-marketing
+d84beda8-6874-4655-bd48-4d59726b190b,1.9094,0.979225,competitor_material,manual-seed://bold-subscriptions-listing-and-analyst-review
+4bb1d4b0-7597-4dd7-b4eb-0793d8277949,0.7778,0.991432,search_signal,https://recurly.com/blog/strategies-to-reduce-and-prevent-subscriber-churn
+2ae07475-e535-49b2-a91e-f0ebcc7242f8,0.7778,0.991432,search_signal,https://www.loopwork.co/blog/dunning-management-tips
+677a2e90-9f81-49b1-8207-2fe9fe93be09,0.7778,0.991432,search_signal,https://getrecharge.com/blog/prevent-passive-churn-with-automated-recharge-dunning-features
+ff063c90-7e9f-4d68-bdf6-4b0045f3710d,0.7778,0.991432,search_signal,https://support.boldcommerce.com/boldsubscriptions/cancellation-dunning-management-in-subscriptions-f
+182bd9be-4f02-46f5-88ad-454a2d865646,0.7778,0.991432,search_signal,https://www.zuora.com/glossary/dunning-management
+b1edc615-9a89-45a4-b746-79e7215c83c4,0.7778,0.991432,search_signal,https://blog.cleeng.com/involuntary-churn-how-to-prevent-lost-revenue-from-failed-subscription-payments
+d49e4b97-9e3c-4711-8de1-a7f28763a91a,0.7778,0.991432,search_signal,https://www.utterbond.com/blog/utterbond-vs-recharge-vs-bold-subscriptions
+65027ef9-d562-4eba-8c50-e760a4001e42,0.7778,0.991432,search_signal,https://www.butterpayments.com/guides/disputes-chargebacks-guides/involuntary-churn
+4e2ef53b-3f65-44e4-a829-609e089c1ea8,0.7778,0.991432,search_signal,https://churnbuster.io/dunning-best-practices
+a6df1cc7-28ba-4a82-8112-0c986d97e8aa,0.7778,0.991432,search_signal,https://www.flycode.com/blog/involuntary-churn-101-what-is-it-and-how-it-relates-to-failed-payments
+48eeea86-69d7-4312-92d9-77d43859a0a9,0.4094,0.995472,search_signal,https://recurly.com/blog/strategies-to-reduce-and-prevent-subscriber-churn
+1326bda0-7358-4264-a658-f4bcfa0ebf23,0.4094,0.995472,search_signal,https://baremetrics.com/blog/dunning-management
+f6668367-6025-4045-bf19-84fb8ba2c469,0.4094,0.995472,search_signal,https://blog.payproglobal.com/saas-dunning-management
+9d730186-6663-4a6b-8fef-71152b8ccc1f,0.4094,0.995472,search_signal,https://www.loopwork.co/blog/manage-involuntary-churn-with-smart-dunning-management
+28535b13-b099-421b-b3b5-537c51934fff,0.4094,0.995472,search_signal,https://support.boldcommerce.com/boldsubscriptions/cancellation-dunning-management-in-subscriptions-f
+92055223-9352-4da6-9778-30562c197a9b,0.4094,0.995472,search_signal,https://www.digitalapplied.com/blog/failed-payment-recovery-dunning-playbook-2026
+96709341-1845-46dd-aae9-556bd1847d26,0.4094,0.995472,search_signal,https://www.zuora.com/glossary/dunning-management
+13395f58-a260-4d51-9006-30649c0e9dee,0.4094,0.995472,search_signal,https://blog.cleeng.com/involuntary-churn-how-to-prevent-lost-revenue-from-failed-subscription-payments
+5e057093-7040-4a72-aaf8-2e63c6c4ef42,0.4094,0.995472,search_signal,https://www.butterpayments.com/guides/disputes-chargebacks-guides/involuntary-churn
+50761a2b-e95b-431c-b263-1efbe62d21d9,0.4094,0.995472,search_signal,https://churnbuster.io/dunning-best-practices
+3a0715ca-a25c-4040-aee2-c95e1a13e387,0.4086,0.995480,search_signal,https://coreppc.com/shopify/recharge-vs-bold-subscriptions
+dbb6d40c-6c46-47f4-9710-42ab3f550a6c,0.4086,0.995480,search_signal,https://www.loopwork.co/blog/recharge-vs-bold-subscriptions
+2bb537a1-65ad-4388-a443-ded14040482c,0.4086,0.995480,search_signal,https://www.utterbond.com/blog/utterbond-vs-recharge-vs-bold-subscriptions
+850a5566-c059-4d82-ac59-31d1a6fa55de,0.4086,0.995480,search_signal,https://zectox.is-a.dev/blog/shopify-subscription-apps-comparison-2026
+62c11c09-79c6-40cc-a0c1-896ebc898cf9,0.4086,0.995480,search_signal,https://www.letstalkshop.com/blog/recharge-vs-bold-subscriptions
+ff642e6f-5223-4068-8edb-2a745276d454,0.4086,0.995480,search_signal,https://stripe.com/resources/more/payment-retries-101-how-businesses-can-make-the-most-of-this-important-detail
+d2aaebde-8bf0-496d-a372-cbbffde04df9,0.4086,0.995480,search_signal,https://help.loopreturns.com/en/articles/1919425
+56f2292d-02a4-4c7e-bb13-234c654a8778,0.4086,0.995480,search_signal,https://www.youtube.com/watch?v=xbfYGnQp9VU
+0d761543-ca4a-4c5d-a91e-58a09a4b936a,0.4086,0.995480,search_signal,https://developer.rechargepayments.com/2021-11/charges/charge_refund
+
+Part A summary: age_days min=0.41 max=1.95 spread=1.54
+Part A summary: freshness min=0.9788 max=0.9955 mean=0.9905
+OBSERVATION: with corpus this fresh, EVERY evidence lands in the top of the curve — the current constant does not discriminate between rows. Part B is where the curve shape is actually visible.
+
+--- Part B: freshness curve over hypothetical ages, across candidate DECAY values ---
+age_days,decay_30d,decay_60d,decay_90d,decay_180d,decay_365d
+0,1.0000,1.0000,1.0000,1.0000,1.0000
+1,0.9677,0.9836,0.9890,0.9945,0.9973
+7,0.8108,0.8955,0.9278,0.9626,0.9812
+14,0.6818,0.8108,0.8654,0.9278,0.9631
+30,0.5000,0.6667,0.7500,0.8571,0.9241
+60,0.3333,0.5000,0.6000,0.7500,0.8588
+90,0.2500,0.4000,0.5000,0.6667,0.8022
+120,0.2000,0.3333,0.4286,0.6000,0.7526
+180,0.1429,0.2500,0.3333,0.5000,0.6697
+270,0.1000,0.1818,0.2500,0.4000,0.5748
+365,0.0759,0.1412,0.1978,0.3303,0.5000
+540,0.0526,0.1000,0.1429,0.2500,0.4033
+730,0.0395,0.0759,0.1098,0.1978,0.3333
+1095,0.0267,0.0519,0.0759,0.1412,0.2500
+
+Reading the table: pick a DECAY column; the value at age=DECAY is 0.5 (the half-life point). Values above the row for age=DECAY are the pre-knee region; below are the tail.
+Suggested read: for a curve where 'a source from 6 months ago is worth ~half of a fresh one,' DECAY=180 is the right knee. For 'a source from 3 months ago is worth ~half,' DECAY=90 is right. Confirm the intended half-life before locking in.
+
+--- KNOWN GAP note ---
+The bench cannot validate DECAY on real corpus rows because no evidence in the DB
+is old enough to reach the curve's knee (all rows are <2 days old). Part B stands
+in for that check by showing the pure math of the curve; Part A is a sanity check
+that the formula runs cleanly on real rows, not a test of the DECAY value itself.
+TODO: revisit Part A once the corpus contains evidence >90 days old (natural
+outcome of running the pipeline in production, or a targeted ingest of older
+industry_report/financial_signal material).
