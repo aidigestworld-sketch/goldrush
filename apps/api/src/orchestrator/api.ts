@@ -352,6 +352,43 @@ export function createOrchestratorRouter(opts: OrchestratorRouterOptions = {}): 
     }
   });
 
+  // POST /runs/:runId/retry
+  // Free retry for a run in the 'failed' state — no Stripe interaction.
+  // Finds all failed_permanent steps, resets each to pending, and re-enqueues
+  // via the same enqueueStep used for fresh runs. Returns 400 if the run is
+  // not failed, 403 if the caller does not own it.
+  router.post("/runs/:runId/retry", async (req: Request, res: Response) => {
+    try {
+      const runId = String(req.params.runId);
+      const pipelineRun = await prisma.pipelineRun.findUnique({ where: { runId } });
+      if (!pipelineRun) return res.status(404).json({ error: "run not found" });
+      if (pipelineRun.founderId !== req.founderId) {
+        return res.status(403).json({ error: "forbidden" });
+      }
+
+      if (pipelineRun.status !== "failed") {
+        return res.status(400).json({
+          error: `cannot retry: run status is '${pipelineRun.status}', only 'failed' runs can be retried`,
+        });
+      }
+
+      const rows = await checkpoint.listForRun(runId);
+      const failedRows = rows.filter((r) => r.status === "failed_permanent");
+      const hypothesisId = rows.find((r) => r.hypothesisId != null)?.hypothesisId ?? undefined;
+
+      const retried: string[] = [];
+      for (const row of failedRows) {
+        await checkpoint.resetForRetry(runId, row.step as DagStep);
+        await doEnqueueStep(row.step as DagStep, { runId, hypothesisId });
+        retried.push(row.step);
+      }
+
+      return res.status(202).json({ runId, retried });
+    } catch (err) {
+      return res.status(500).json({ error: (err as Error).message });
+    }
+  });
+
   // GET /founders/:id/runs
   // Returns all pipeline_runs for a founder, newest-first.
   // Each entry includes:

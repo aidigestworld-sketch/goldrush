@@ -111,20 +111,30 @@ export async function markSucceeded(
 // the retry attempts have been exhausted (job.attemptsMade >= attempts).
 // Intermediate failures leave the row status='running' (or the DB
 // update rolled back if the handler threw before markSucceeded).
+//
+// The transaction atomically marks dag_run_state failed_permanent AND
+// sets pipeline_run.status = "failed" so the retry endpoint can read
+// a single authoritative field instead of re-deriving status from rows.
 export async function markFailedPermanent(
   runId: string,
   step: DagStep,
   errorMessage: string
 ): Promise<CheckpointRow | null> {
-  const affected = await prisma.dagRunState.updateMany({
-    where: { runId, step },
-    data: {
-      status: "failed_permanent",
-      lastError: errorMessage.slice(0, 8000),
-      updatedAt: new Date(),
-    },
-  });
-  if (affected.count === 0) return null;
+  const [dagResult] = await prisma.$transaction([
+    prisma.dagRunState.updateMany({
+      where: { runId, step },
+      data: {
+        status: "failed_permanent",
+        lastError: errorMessage.slice(0, 8000),
+        updatedAt: new Date(),
+      },
+    }),
+    prisma.pipelineRun.updateMany({
+      where: { runId },
+      data: { status: "failed" },
+    }),
+  ]);
+  if (dagResult.count === 0) return null;
   const row = await prisma.dagRunState.findUnique({
     where: { runId_step: { runId, step } },
   });
