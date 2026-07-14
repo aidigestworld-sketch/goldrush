@@ -62,6 +62,14 @@ export default function RunStatusView({
     }
   }
 
+  // Clear a stale retry error whenever the overall status changes — e.g.
+  // the user hit retry too early ("run status is 'running'"), the run later
+  // transitioned to 'failed' via polling, and the old error banner is stale.
+  useEffect(() => {
+    setRetryState("idle");
+    setRetryError(null);
+  }, [data.run.overall]);
+
   // Poll while the run is not yet in a terminal state. React's effect
   // cleanup clears the interval; when data.run.overall changes to a
   // terminal value the effect re-runs, returns early, and no new interval

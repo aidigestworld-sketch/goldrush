@@ -52,4 +52,20 @@ describe("resolveHypothesisIdForRun", () => {
       "no active hypothesis found"
     );
   });
+
+  it("Stripe-originated run (no hypothesisId): resolves via pipelineRunId fallback after Hypothesis Generation writes the row", async () => {
+    // Regression guard for the bug that failed the live run at 07:45 on 2026-07-14:
+    // The old code passed id: undefined directly to findUnique. The fix skips
+    // findUnique when trackingKey is undefined and goes straight to the fallback
+    // which queries by pipelineRunId — matching how hypothesisAgent.ts always
+    // writes the row (pipelineRunId: runId, line 124).
+    //
+    // The hypothesis seeded in beforeAll has pipelineRunId: RUN_ID, exactly
+    // mirroring what hypothesisAgent.ts produces. Calling with undefined
+    // trackingKey must succeed and return the same id.
+    const resolved = await resolveHypothesisIdForRun(RUN_ID, undefined);
+    expect(resolved).toBe(hypothesisId);
+    // Confirm it did NOT throw "Invalid prisma.hypothesis.findUnique() invocation"
+    // (the Prisma error seen in dag_run_state.last_error for that live run).
+  });
 });

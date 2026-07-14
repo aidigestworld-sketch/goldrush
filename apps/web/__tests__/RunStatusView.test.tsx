@@ -388,6 +388,28 @@ describe("RunStatusView retry button", () => {
     // Button is re-enabled after error
     expect(screen.getByTestId("retry-button")).not.toBeDisabled();
   });
+
+  it("clears stale retry error banner when overall status changes (second retry succeeds)", async () => {
+    // The useEffect on data.run.overall resets retryState/retryError whenever
+    // overall changes — so a stale error from a previous failed retry attempt
+    // disappears as soon as the run's status transitions.
+    // Here: first retry fails → error banner shows; second retry succeeds →
+    // setData(IN_PROGRESS) changes overall → useEffect clears the banner.
+    mockRetryRun
+      .mockRejectedValueOnce(new Error("cannot retry: run status is 'running'"))
+      .mockResolvedValueOnce({ runId: "r1", retried: ["expansion"] });
+    mockGetRunStatus.mockResolvedValueOnce(IN_PROGRESS);
+
+    render(<RunStatusView runId="r1" initialData={WITH_FAILURE} />);
+
+    // First click: error
+    fireEvent.click(screen.getByTestId("retry-button"));
+    await waitFor(() => expect(screen.getByTestId("retry-error")).toBeInTheDocument());
+
+    // Second click: success → setData(IN_PROGRESS) → overall "failed"→"in_progress" → banner clears
+    fireEvent.click(screen.getByTestId("retry-button"));
+    await waitFor(() => expect(screen.queryByTestId("retry-error")).not.toBeInTheDocument());
+  });
 });
 
 // ── Polling stop tests (fake timers) ─────────────────────────────────────
