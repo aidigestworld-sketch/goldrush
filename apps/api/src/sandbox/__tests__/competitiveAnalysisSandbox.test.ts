@@ -40,6 +40,38 @@ class GoodMockLLM implements LLMClient {
   }
 }
 
+class ProsePreambleMockLLM implements LLMClient {
+  async complete(): Promise<string> {
+    return (
+      "Here is the competitive analysis based on the provided documents:\n\n" +
+      JSON.stringify({
+        existing_solutions: [
+          {
+            label: "Recharge",
+            positioning_summary: "Built for growing and enterprise subscription brands.",
+            positioning_summary_quote: "built for growing and enterprise subscription brands",
+            positioning_summary_is_competitor_stated: true,
+            pricing_summary: null,
+            pricing_summary_quote: null,
+            strengths: ["dunning and payment-recovery tooling included at every tier"],
+            weaknesses: [],
+            estimated_market_share: null,
+            evidence_refs: ["doc-301"],
+          },
+        ],
+        business_models: [
+          {
+            competitor_label: "Recharge",
+            model_type: "tiered_subscription_plus_percent_plus_per_order",
+            model_type_quote: "1.0-1.49% and $0.19 per order",
+            evidence_refs: ["doc-301"],
+          },
+        ],
+      })
+    );
+  }
+}
+
 class StereotypeMockLLM implements LLMClient {
   async complete(): Promise<string> {
     return JSON.stringify({
@@ -71,6 +103,14 @@ describe("competitiveAnalysisSandbox", () => {
     expect(good.validationErrors.length).toBe(0);
     expect(good.boundedRuleViolations.length).toBe(0);
     expect(good.sourceAttributionWarnings.some((w) => w.includes("Bold Subscriptions"))).toBe(true);
+  });
+
+  it("prose preamble before JSON: extractAndClean strips preamble and parses correctly", async () => {
+    const result = await runCompetitiveAnalysisSandbox(new ProsePreambleMockLLM(), competitiveAnalysisInputDocs);
+    expect(result.parsed).not.toBeNull();
+    expect(result.validationErrors.length).toBe(0);
+    expect(result.parsed?.existing_solutions.length).toBe(1);
+    expect(result.boundedRuleViolations.length).toBe(0);
   });
 
   it("stereotype response: parses but invented free-trial claim caught as category-stereotype violation", async () => {

@@ -31,6 +31,31 @@ class GoodMockLLM implements LLMClient {
   }
 }
 
+class ProsePreambleMockLLM implements LLMClient {
+  async complete(): Promise<string> {
+    return (
+      "Based on the problem and existing solutions provided, here is my analysis:\n\n" +
+      JSON.stringify({
+        hypotheses: [
+          {
+            statement:
+              "Existing solutions lack a mechanism to differentiate between intentional and unintentional subscription cancellations caused by payment method changes.",
+            gap_type: "positioning",
+            evidence_for: [
+              "173a0c23-e41d-4c32-af0c-d484c9add01a",
+              "08902600-d4e9-45c4-bf8f-773277500c27",
+            ],
+            evidence_against: [],
+            existing_solutions_considered: ["08902600-d4e9-45c4-bf8f-773277500c27"],
+            missing_data: [],
+            confidence: 0.6,
+          },
+        ],
+      })
+    );
+  }
+}
+
 class SingleSourceMockLLM implements LLMClient {
   async complete(): Promise<string> {
     return JSON.stringify({
@@ -98,6 +123,14 @@ describe("hypothesisSandbox", () => {
     expect(good.validationErrors.length).toBe(0);
     expect(good.boundedRuleViolations.length).toBe(0);
     expect(good.parsed?.hypotheses[0]?.existing_solutions_considered.length).toBe(3);
+  });
+
+  it("prose preamble before JSON: extractAndClean strips preamble and parses correctly", async () => {
+    const result = await runHypothesisSandbox(new ProsePreambleMockLLM(), hypothesisInput);
+    expect(result.parsed).not.toBeNull();
+    expect(result.validationErrors.length).toBe(0);
+    expect(result.parsed?.hypotheses.length).toBe(1);
+    expect(result.parsed?.hypotheses[0].gap_type).toBe("positioning");
   });
 
   it("single-source (same id cited twice): parses but Bounded Synthesis Rule violation fired", async () => {

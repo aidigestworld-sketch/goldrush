@@ -55,7 +55,7 @@ Rules you MUST follow exactly:
 - You do NOT invent numbers. If a document doesn't state a market size or growth rate, use null — never estimate or guess.
 - Output volume bias: prefer including a plausible market candidate over omitting it, but every single one still needs a real evidence_ref. High volume, low confidence is fine; volume with zero grounding is not.
 
-Respond with ONLY valid JSON matching this exact shape, no other text:
+Respond with ONLY valid JSON matching this exact shape. Your response MUST begin with { and end with }. Do not include any explanation, preamble, commentary, or markdown formatting before or after the JSON object — not even a single word:
 {
   "markets": [
     {
@@ -84,6 +84,15 @@ export interface DiscoverySandboxResult {
   boundedRuleViolations: string[]; // markets that parsed fine per schema but still violate AI_AGENTS.md §1 invariants
 }
 
+// Extract the JSON object from a raw model response, tolerating prose
+// preamble or markdown fences (e.g. "Here is the extracted JSON:\n{...}").
+function extractAndClean(raw: string): string {
+  const first = raw.indexOf("{");
+  const last = raw.lastIndexOf("}");
+  if (first !== -1 && last > first) return raw.slice(first, last + 1);
+  return raw.trim().replace(/^```json\s*/i, "").replace(/```\s*$/, "");
+}
+
 export async function runDiscoverySandbox(
   llm: LLMClient,
   documents: DiscoveryInputDocument[]
@@ -96,9 +105,7 @@ export async function runDiscoverySandbox(
   const boundedRuleViolations: string[] = [];
 
   try {
-    // Models sometimes wrap JSON in markdown fences despite instructions —
-    // strip that defensively rather than failing on an easily-fixed format issue.
-    const cleaned = rawResponse.trim().replace(/^```json\s*/i, "").replace(/```\s*$/, "");
+    const cleaned = extractAndClean(rawResponse);
     const json = JSON.parse(cleaned);
     const result = DiscoveryOutputSchema.safeParse(json);
     if (result.success) {

@@ -102,7 +102,7 @@ Also distinguish: is a claim about a competitor coming from the competitor's OWN
 
 Do not rank competitors or recommend anything. Structure only.
 
-Respond with ONLY valid JSON matching this exact shape, no other text:
+Respond with ONLY valid JSON matching this exact shape. Your response MUST begin with { and end with }. Do not include any explanation, preamble, commentary, or markdown formatting before or after the JSON object — not even a single word:
 {
   "existing_solutions": [{
     "label": string,
@@ -153,6 +153,15 @@ function normalize(s: string): string {
   return s.replace(/\s+/g, " ").trim().toLowerCase();
 }
 
+// Extract the JSON object from a raw model response, tolerating prose
+// preamble or markdown fences (e.g. "Here is the analysis:\n{...}").
+function extractAndClean(raw: string): string {
+  const first = raw.indexOf("{");
+  const last = raw.lastIndexOf("}");
+  if (first !== -1 && last > first) return raw.slice(first, last + 1);
+  return raw.trim().replace(/^```json\s*/i, "").replace(/```\s*$/, "");
+}
+
 export async function runCompetitiveAnalysisSandbox(
   llm: LLMClient,
   documents: CompetitiveAnalysisInputDocument[]
@@ -166,7 +175,7 @@ export async function runCompetitiveAnalysisSandbox(
   const sourceAttributionWarnings: string[] = [];
 
   try {
-    const cleaned = rawResponse.trim().replace(/^```json\s*/i, "").replace(/```\s*$/, "");
+    const cleaned = extractAndClean(rawResponse);
     const json = JSON.parse(cleaned);
     const result = CompetitiveAnalysisOutputSchema.safeParse(json);
     if (!result.success) {

@@ -101,7 +101,7 @@ Rules you MUST follow exactly:
 - Do NOT propose a solution. State the gap, not what should be built to fill it — that's a downstream concern, not yours.
 - Do not invent facts about the Problem or ExistingSolutions not present in what you were given.
 
-Respond with ONLY valid JSON matching this exact shape, no other text:
+Respond with ONLY valid JSON matching this exact shape. Your response MUST begin with { and end with }. Do not include any explanation, preamble, commentary, or markdown formatting before or after the JSON object — not even a single word:
 {
   "hypotheses": [{
     "statement": string,
@@ -146,6 +146,15 @@ export interface HypothesisSandboxResult {
   boundedRuleViolations: string[];
 }
 
+// Extract the JSON object from a raw model response, tolerating prose
+// preamble or markdown fences (e.g. "Based on the problem provided...\n{...}").
+function extractAndClean(raw: string): string {
+  const first = raw.indexOf("{");
+  const last = raw.lastIndexOf("}");
+  if (first !== -1 && last > first) return raw.slice(first, last + 1);
+  return raw.trim().replace(/^```json\s*/i, "").replace(/```\s*$/, "");
+}
+
 export async function runHypothesisSandbox(
   llm: LLMClient,
   input: HypothesisSandboxInput
@@ -158,7 +167,7 @@ export async function runHypothesisSandbox(
   const boundedRuleViolations: string[] = [];
 
   try {
-    const cleaned = rawResponse.trim().replace(/^```json\s*/i, "").replace(/```\s*$/, "");
+    const cleaned = extractAndClean(rawResponse);
     const json = JSON.parse(cleaned);
     const result = HypothesisOutputSchema.safeParse(json);
     if (!result.success) {

@@ -58,6 +58,27 @@ class MalformedLLM implements LLMClient {
 // previous max_tokens=4096 ceiling (~16KB of JSON ≈ 4096 tokens at 4 chars/token).
 // Regression guard: if NimLLMClient's max_tokens ever regresses below 4096,
 // a real live run with this volume of output would again produce truncated JSON.
+class ProsePreambleMockLLM implements LLMClient {
+  async complete(): Promise<string> {
+    return (
+      "Here is the extracted JSON based on the documents provided:\n\n" +
+      JSON.stringify({
+        markets: [
+          {
+            label: "Shopify subscription & recurring-order apps",
+            market_size_estimate: null,
+            growth_rate_estimate: null,
+            maturity_stage: "mature",
+            category_tags: ["subscriptions", "recurring-orders"],
+            confidence: 0.7,
+            evidence_refs: ["doc-001"],
+          },
+        ],
+      })
+    );
+  }
+}
+
 class LargeOutputMockLLM implements LLMClient {
   static readonly MARKET_COUNT = 32;
 
@@ -103,6 +124,13 @@ describe("discoverySandbox", () => {
     const malformed = await runDiscoverySandbox(new MalformedLLM(), discoveryInputDocs);
     expect(malformed.parsed).toBeNull();
     expect(malformed.validationErrors.length).toBeGreaterThan(0);
+  });
+
+  it("prose preamble before JSON: extractAndClean strips preamble and parses correctly", async () => {
+    const result = await runDiscoverySandbox(new ProsePreambleMockLLM(), discoveryInputDocs);
+    expect(result.parsed).not.toBeNull();
+    expect(result.validationErrors.length).toBe(0);
+    expect(result.parsed?.markets.length).toBe(1);
   });
 
   it("large output: parses and validates a response that would have been truncated at max_tokens=4096", async () => {
