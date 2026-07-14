@@ -28,5 +28,5 @@ export default async function RunStatusPage({ params }: Props) {
     );
   }
 
-  return <RunStatusView runId={runId} initialData={initialData} />;
+  return <RunStatusView runId={runId} initialData={initialData} accessToken={session.access_token} />;
 }

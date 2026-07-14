@@ -45,6 +45,7 @@ export default defineConfig({
       "src/sandbox/__tests__/opportunityRationaleSandbox.test.ts",
       "src/sandbox/__tests__/validationSandbox.test.ts",
       "src/orchestrator/__tests__/resolveHypothesisId.test.ts",
+      "src/orchestrator/__tests__/retryRun.test.ts",
       "src/orchestrator/__tests__/checkpointIdempotency.test.ts",
       "src/orchestrator/__tests__/founderRunsList.test.ts",
       "src/orchestrator/__tests__/statusEndpoint.test.ts",

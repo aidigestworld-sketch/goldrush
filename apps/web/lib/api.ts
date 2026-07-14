@@ -178,7 +178,25 @@ export async function postIntakeTurn(
   return res.json() as Promise<IntakeTurnResponse>;
 }
 
-// ── Founder run list (dashboard) ──────────────────────────────────────────
+// ── Run retry ─────────────────────────────────────────────────────────────
+
+export async function retryRun(
+  runId: string,
+  accessToken?: string
+): Promise<{ runId: string; retried: string[] }> {
+  const res = await fetch(`${API_BASE}/runs/${runId}/retry`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      ...(accessToken ? { authorization: `Bearer ${accessToken}` } : {}),
+    },
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => res.statusText);
+    throw new Error(`POST /runs/${runId}/retry failed (${res.status}): ${text}`);
+  }
+  return res.json() as Promise<{ runId: string; retried: string[] }>;
+}
 
 // ── Stripe checkout ───────────────────────────────────────────────────────
 

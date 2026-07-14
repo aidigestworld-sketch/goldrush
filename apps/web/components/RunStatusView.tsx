@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import type { RunStatus, Stage } from "../lib/api";
-import { getRunStatus } from "../lib/api";
+import { getRunStatus, retryRun } from "../lib/api";
 import StageRow from "./StageRow";
 import ForkStage from "./ForkStage";
 import StatusBadge from "./StatusBadge";
@@ -27,9 +27,13 @@ function renderStage(stage: Stage, idx: number) {
   );
 }
 
+type RetryState = "idle" | "retrying" | "error";
+
 interface Props {
   runId: string;
   initialData: RunStatus;
+  /** Supabase access token forwarded from the server component for POST /retry. */
+  accessToken?: string;
   /** Override for tests — pass a small value to avoid real waits. */
   pollIntervalMs?: number;
 }
@@ -37,9 +41,26 @@ interface Props {
 export default function RunStatusView({
   runId,
   initialData,
+  accessToken,
   pollIntervalMs = DEFAULT_POLL_INTERVAL_MS,
 }: Props) {
   const [data, setData] = useState<RunStatus>(initialData);
+  const [retryState, setRetryState] = useState<RetryState>("idle");
+  const [retryError, setRetryError] = useState<string | null>(null);
+
+  async function handleRetry() {
+    setRetryState("retrying");
+    setRetryError(null);
+    try {
+      await retryRun(runId, accessToken);
+      const fresh = await getRunStatus(runId);
+      setData(fresh);
+      setRetryState("idle");
+    } catch (err) {
+      setRetryError((err as Error).message);
+      setRetryState("error");
+    }
+  }
 
   // Poll while the run is not yet in a terminal state. React's effect
   // cleanup clears the interval; when data.run.overall changes to a
@@ -94,6 +115,25 @@ export default function RunStatusView({
           <StatusBadge status={run.overall} />
         </div>
       </div>
+
+      {/* Retry — only shown when failed */}
+      {run.overall === "failed" && (
+        <div className="mb-5" data-testid="retry-container">
+          <button
+            onClick={handleRetry}
+            disabled={retryState === "retrying"}
+            className="inline-flex items-center gap-2 rounded-md bg-gray-900 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-gray-700 disabled:opacity-50 transition-colors"
+            data-testid="retry-button"
+          >
+            {retryState === "retrying" ? "Retrying…" : "Retry analysis"}
+          </button>
+          {retryState === "error" && retryError && (
+            <p className="mt-2 text-sm text-red-600" data-testid="retry-error">
+              {retryError}
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Result link — only shown when completed */}
       {run.overall === "completed" && (

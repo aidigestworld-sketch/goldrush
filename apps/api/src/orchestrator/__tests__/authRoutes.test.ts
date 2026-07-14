@@ -257,6 +257,30 @@ describe("auth routes", () => {
     });
   });
 
+  describe("POST /runs/:runId/retry ownership", () => {
+    let retryRunId: string;
+
+    beforeAll(async () => {
+      retryRunId = (await prisma.pipelineRun.create({
+        data: { founderId: founderAId, vertical: "auth-test-vertical" },
+      })).runId;
+      createdRunIds.push(retryRunId);
+      await checkpoint.upsertPending({ runId: retryRunId, step: "discovery" });
+      await checkpoint.markFailedPermanent(retryRunId, "discovery", "injected-for-auth-retry-test");
+      createdCheckpointRunIds.push(retryRunId);
+    });
+
+    it("owner retrying own failed run → 202", async () => {
+      const res = await httpPost(port, `/runs/${retryRunId}/retry`, {}, TOKEN_A);
+      expect(res.status).toBe(202);
+    });
+
+    it("non-owner → 403", async () => {
+      const res = await httpPost(port, `/runs/${retryRunId}/retry`, {}, TOKEN_B);
+      expect(res.status).toBe(403);
+    });
+  });
+
   describe("POST /founders/:id/intake/turn ownership", () => {
     it("owner posting to own intake turn → 200", async () => {
       const res = await httpPost(port, `/founders/${founderAId}/intake/turn`, {}, TOKEN_A);

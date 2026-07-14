@@ -11,15 +11,16 @@ import { render, screen, waitFor, fireEvent, act } from "@testing-library/react"
 import RunStatusView from "../components/RunStatusView";
 import type { RunStatus, StepInfo, Stage } from "../lib/api";
 
-// Mock the API module so polling never hits the network.
+// Mock the API module so polling and retry never hit the network.
 vi.mock("../lib/api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../lib/api")>();
-  return { ...actual, getRunStatus: vi.fn() };
+  return { ...actual, getRunStatus: vi.fn(), retryRun: vi.fn() };
 });
 
-// Import the mock AFTER vi.mock so we get the mocked version.
-const { getRunStatus } = await import("../lib/api");
+// Import the mocks AFTER vi.mock so we get the mocked versions.
+const { getRunStatus, retryRun } = await import("../lib/api");
 const mockGetRunStatus = vi.mocked(getRunStatus);
+const mockRetryRun = vi.mocked(retryRun);
 
 // ── Fixture builders ──────────────────────────────────────────────────────
 
@@ -315,6 +316,77 @@ describe("RunStatusView", () => {
       () => expect(screen.getByTestId("result-link")).toBeInTheDocument(),
       { timeout: 300 }
     );
+  });
+});
+
+  // ── Retry button ──────────────────────────────────────────────────────────
+
+describe("RunStatusView retry button", () => {
+  afterEach(() => { vi.clearAllMocks(); });
+
+  it("shows retry button only when overall is failed", () => {
+    render(<RunStatusView runId="r1" initialData={WITH_FAILURE} />);
+    expect(screen.getByTestId("retry-button")).toBeInTheDocument();
+  });
+
+  it("does not show retry button when in_progress", () => {
+    render(<RunStatusView runId="r1" initialData={IN_PROGRESS} />);
+    expect(screen.queryByTestId("retry-button")).not.toBeInTheDocument();
+  });
+
+  it("does not show retry button when completed", () => {
+    render(<RunStatusView runId="run-test-1" initialData={COMPLETED} />);
+    expect(screen.queryByTestId("retry-button")).not.toBeInTheDocument();
+  });
+
+  it("clicking retry calls retryRun then getRunStatus and transitions back to in_progress", async () => {
+    mockRetryRun.mockResolvedValueOnce({ runId: "r1", retried: ["expansion"] });
+    mockGetRunStatus.mockResolvedValueOnce(IN_PROGRESS);
+
+    render(<RunStatusView runId="r1" initialData={WITH_FAILURE} accessToken="test-token" />);
+    fireEvent.click(screen.getByTestId("retry-button"));
+
+    await waitFor(() => {
+      expect(mockRetryRun).toHaveBeenCalledWith("r1", "test-token");
+    });
+    await waitFor(() => {
+      expect(mockGetRunStatus).toHaveBeenCalledWith("r1");
+    });
+    // After transition the retry button disappears (overall is in_progress now)
+    await waitFor(() => {
+      expect(screen.queryByTestId("retry-button")).not.toBeInTheDocument();
+    });
+  });
+
+  it("retry button is disabled and shows 'Retrying…' while the call is in flight", async () => {
+    let resolveRetry!: (v: { runId: string; retried: string[] }) => void;
+    mockRetryRun.mockReturnValueOnce(
+      new Promise<{ runId: string; retried: string[] }>((r) => { resolveRetry = r; })
+    );
+
+    render(<RunStatusView runId="r1" initialData={WITH_FAILURE} />);
+    fireEvent.click(screen.getByTestId("retry-button"));
+
+    expect(screen.getByTestId("retry-button")).toHaveTextContent("Retrying…");
+    expect(screen.getByTestId("retry-button")).toBeDisabled();
+
+    // Clean up dangling promise
+    mockGetRunStatus.mockResolvedValueOnce(IN_PROGRESS);
+    resolveRetry({ runId: "r1", retried: ["expansion"] });
+  });
+
+  it("shows retry error when retryRun throws", async () => {
+    mockRetryRun.mockRejectedValueOnce(new Error("server error"));
+
+    render(<RunStatusView runId="r1" initialData={WITH_FAILURE} />);
+    fireEvent.click(screen.getByTestId("retry-button"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("retry-error")).toBeInTheDocument();
+    });
+    expect(screen.getByTestId("retry-error")).toHaveTextContent("server error");
+    // Button is re-enabled after error
+    expect(screen.getByTestId("retry-button")).not.toBeDisabled();
   });
 });
 
