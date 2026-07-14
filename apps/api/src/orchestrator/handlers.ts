@@ -33,7 +33,7 @@ import type { DagStep } from "./steps";
 
 export interface JobData {
   runId: string;
-  hypothesisId: string;
+  hypothesisId?: string;
   // Optional overrides; defaults are derived from runContext + DB state.
   marketId?: string;
   problemId?: string;
@@ -286,14 +286,24 @@ function competitorNameFromUrl(url: string): string | null {
 // differs from the orchestrator's tracking key (data.hypothesisId). This
 // helper tries the tracking key first (works on re-runs) and falls back to
 // the most recent active hypothesis written by this run.
-async function resolveHypothesisIdForRun(runId: string, trackingKey: string): Promise<string> {
-  const direct = await prisma.hypothesis.findUnique({ where: { id: trackingKey } });
-  if (direct) return direct.id;
+//
+// trackingKey is string | undefined because JobData.hypothesisId is optional:
+// Stripe-originated runs never have a pre-existing hypothesisId. For those
+// runs, skip findUnique entirely (Prisma throws on { where: { id: undefined } })
+// and use the fallback path directly.
+export async function resolveHypothesisIdForRun(runId: string, trackingKey: string | undefined): Promise<string> {
+  if (trackingKey) {
+    const direct = await prisma.hypothesis.findUnique({ where: { id: trackingKey } });
+    if (direct) return direct.id;
+  }
   const fallback = await prisma.hypothesis.findFirst({
     where: { status: "active", pipelineRunId: runId },
     orderBy: { createdAt: "desc" },
   });
-  return fallback?.id ?? trackingKey;
+  if (!fallback) {
+    throw new Error(`resolveHypothesisIdForRun: no active hypothesis found for runId=${runId}`);
+  }
+  return fallback.id;
 }
 
 // For fresh runs: problem agent creates a DB row before hypothesis_sources

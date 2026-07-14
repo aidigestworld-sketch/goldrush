@@ -9,8 +9,8 @@ async function main() {
   const active = probs.filter((x) => x.status === "active");
   const depr = probs.filter((x) => x.status === "deprecated");
   console.log(`  active: ${active.length}  deprecated: ${depr.length}`);
-  for (const d of depr) console.log(`  DEPRECATED: "${d.label.slice(0, 60)}"  reason=${d.deprecationReason}  conf=${d.confidence}`);
-  for (const a of active) console.log(`  ACTIVE: conf=${a.confidence}  "${a.label.slice(0, 60)}"`);
+  for (const d of depr) console.log(`  DEPRECATED: "${d.label?.slice(0, 60)}"  reason=${d.deprecationReason}  conf=${d.confidence}`);
+  for (const a of active) console.log(`  ACTIVE: conf=${a.confidence}  "${a.label?.slice(0, 60)}"`);
 
   const compMat = await p.evidence.findMany({ where: { sourceType: "competitor_material" }, select: { id: true, vertical: true, sourceUrlOrIdentifier: true, status: true } });
   console.log(`\ncompetitor_material evidence total: ${compMat.length}`);

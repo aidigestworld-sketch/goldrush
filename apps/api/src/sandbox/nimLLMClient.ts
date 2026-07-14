@@ -11,10 +11,18 @@
 import type { LLMClient } from "./llmClient";
 
 export class NimLLMClient implements LLMClient {
+  // nvidia/nvidia-nemotron-nano-9b-v2 max output ceiling is 32768 tokens
+  // (per NVIDIA API docs). 16384 is the new default — half the ceiling,
+  // enough headroom for Discovery (large markets[] arrays) and Expansion
+  // (problems[] with verbatim quote fields) without risk of a hard API
+  // error. Raised from 4096 which was truncating Discovery live runs.
+  static readonly DEFAULT_MAX_TOKENS = 16384;
+
   constructor(
     private readonly apiKey: string,
     private readonly model: string,
-    private readonly baseUrl: string = "https://integrate.api.nvidia.com/v1"
+    private readonly baseUrl: string = "https://integrate.api.nvidia.com/v1",
+    private readonly maxTokens: number = NimLLMClient.DEFAULT_MAX_TOKENS
   ) {}
 
   // 10-minute ceiling per call. Legitimate calls on the 49B model have
@@ -39,7 +47,7 @@ export class NimLLMClient implements LLMClient {
           { role: "user", content: userPrompt },
         ],
         temperature: 0.2, // low temperature — this is structured extraction, not creative generation
-        max_tokens: 4096, // raised from 2048 during V8 rollout (confidenceSandbox.ts): the V8 schema's per_evidence_answers_question map + rationale can exceed 2048 tokens on 10-item pools, which was truncating output mid-JSON on the bench's first attempt. 4096 gives headroom without significantly changing per-call cost.
+        max_tokens: this.maxTokens,
       }),
     }).finally(() => clearTimeout(timer));
     if (!response.ok) {
@@ -47,9 +55,14 @@ export class NimLLMClient implements LLMClient {
     }
     const data = await response.json();
     if (data.choices?.[0]?.finish_reason === "length") {
-      console.warn(
-        `[NimLLMClient] model=${this.model} finish_reason=length — output was truncated at max_tokens (${4096}); ` +
-          "if JSON is malformed this is the cause, consider raising max_tokens"
+      // Throw immediately rather than returning truncated JSON — the caller
+      // would receive malformed JSON that fails schema validation, producing
+      // a confusing "Unexpected end of JSON input" error with no indication
+      // of the real cause. Retrying at the same budget won't help; the error
+      // message tells the operator exactly what to fix instead.
+      throw new Error(
+        `[NimLLMClient] model=${this.model} finish_reason=length — output truncated at max_tokens=${this.maxTokens}. ` +
+          "Retrying with the same budget will not recover. Raise maxTokens or reduce input scope."
       );
     }
     return data.choices?.[0]?.message?.content ?? "";

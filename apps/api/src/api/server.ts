@@ -10,6 +10,8 @@ import express from "express";
 import type { Express } from "express";
 import { createOrchestratorRouter, type OrchestratorRouterOptions } from "../orchestrator/api";
 import { startWorkers, stopWorkers } from "../orchestrator/worker";
+import { makeWebhookHandler } from "../stripe/webhook";
+import { getStripe } from "../stripe/client";
 
 export function createApp(opts: OrchestratorRouterOptions = {}): Express {
   const app = express();
@@ -24,8 +26,19 @@ export function createApp(opts: OrchestratorRouterOptions = {}): Express {
     cors({
       origin: allowedOrigins.length === 1 ? allowedOrigins[0] : allowedOrigins,
       methods: ["GET", "POST", "OPTIONS"],
-      allowedHeaders: ["Authorization", "Content-Type"],
+      allowedHeaders: ["Authorization", "Content-Type", "stripe-signature"],
     })
+  );
+
+  // Stripe webhook must receive the raw body for signature verification.
+  // Registered BEFORE express.json() so the global parser does not consume it.
+  // This route is intentionally unauthenticated — Stripe verifies its own
+  // signature; JWT auth would break it.
+  const stripeClient = opts.stripe ?? getStripe();
+  app.post(
+    "/webhooks/stripe",
+    express.raw({ type: "application/json" }),
+    makeWebhookHandler(stripeClient, { enqueueStep: opts.enqueueStep })
   );
 
   app.use(express.json({ limit: "1mb" }));

@@ -180,6 +180,53 @@ export async function postIntakeTurn(
 
 // ── Founder run list (dashboard) ──────────────────────────────────────────
 
+// ── Stripe checkout ───────────────────────────────────────────────────────
+
+export async function createCheckoutSession(
+  founderId: string,
+  vertical: string,
+  accessToken?: string
+): Promise<{ url: string }> {
+  const res = await fetch(`${API_BASE}/founders/${founderId}/checkout`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      ...(accessToken ? { authorization: `Bearer ${accessToken}` } : {}),
+    },
+    body: JSON.stringify({ vertical }),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => res.statusText);
+    throw new Error(`Checkout session creation failed (${res.status}): ${text}`);
+  }
+  return res.json() as Promise<{ url: string }>;
+}
+
+export interface CheckoutStatus {
+  paid: boolean;
+  runId: string | null;
+}
+
+export async function getCheckoutStatus(
+  founderId: string,
+  sessionId: string,
+  accessToken?: string
+): Promise<CheckoutStatus> {
+  const res = await fetch(
+    `${API_BASE}/founders/${founderId}/checkout-status?session_id=${encodeURIComponent(sessionId)}`,
+    {
+      cache: "no-store",
+      headers: accessToken ? { authorization: `Bearer ${accessToken}` } : {},
+    }
+  );
+  if (!res.ok) {
+    throw new Error(`Checkout status check failed (${res.status})`);
+  }
+  return res.json() as Promise<CheckoutStatus>;
+}
+
+// ── Founder run list (dashboard) ──────────────────────────────────────────
+
 export async function getFounderRuns(founderId: string, accessToken?: string): Promise<FounderRun[]> {
   const res = await fetch(`${API_BASE}/founders/${founderId}/runs`, {
     // No caching — dashboard should always reflect live run state.

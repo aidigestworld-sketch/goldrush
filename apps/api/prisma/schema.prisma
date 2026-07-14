@@ -55,6 +55,7 @@ model PipelineRun {
   failureReason         String?                @map("failure_reason")
   startedAt             DateTime               @default(now()) @map("started_at") @db.Timestamptz(6)
   completedAt           DateTime?              @map("completed_at") @db.Timestamptz(6)
+  stripeSessionId       String?                @unique @map("stripe_session_id")
   agentExecutionLogs    AgentExecutionLog[]
   opportunityCandidates OpportunityCandidate[]
   founder               Founder                @relation(fields: [founderId], references: [id], onDelete: NoAction, onUpdate: NoAction)

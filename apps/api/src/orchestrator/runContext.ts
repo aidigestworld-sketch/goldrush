@@ -18,7 +18,7 @@ export interface RunContext {
 
 const cache = new Map<string, RunContext>();
 
-export async function loadRunContext(runId: string, hypothesisId: string): Promise<RunContext> {
+export async function loadRunContext(runId: string, hypothesisId?: string): Promise<RunContext> {
   const cached = cache.get(runId);
   if (cached) return cached;
 
@@ -27,7 +27,9 @@ export async function loadRunContext(runId: string, hypothesisId: string): Promi
 
   // Resolve problemId via hypothesis_sources (Composition expects
   // exactly one problem per hypothesis).
-  const sources = await prisma.hypothesisSource.findMany({ where: { hypothesisId } });
+  const sources = hypothesisId
+    ? await prisma.hypothesisSource.findMany({ where: { hypothesisId } })
+    : [];
   const problemIds = [...new Set(sources.map((s) => s.problemId))];
   if (problemIds.length !== 1) {
     // Not a fatal error at context-load time — some early stages
@@ -40,7 +42,7 @@ export async function loadRunContext(runId: string, hypothesisId: string): Promi
     runId,
     founderId: run.founderId,
     vertical: run.vertical,
-    hypothesisId,
+    hypothesisId: hypothesisId ?? "",
     problemId: problemIds[0] ?? "",
   };
   cache.set(runId, ctx);

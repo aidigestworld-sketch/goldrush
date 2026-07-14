@@ -34,6 +34,9 @@ import {
   JOIN_STEP,
   type DagStep,
 } from "./steps";
+import type { StripeClient } from "../stripe/types";
+import { getStripe } from "../stripe/client";
+import { ALLOWED_VERTICALS } from "./verticals";
 import {
   emptyIntakeState,
   recordFieldAsked,
@@ -61,12 +64,28 @@ import { supabaseAdmin } from "../lib/supabaseAdmin";
 export interface OrchestratorRouterOptions {
   verifyJwt?: JwtVerifier;
   enqueueStep?: (step: DagStep, data: JobData) => Promise<{ enqueued: boolean; reason?: string }>;
+  stripe?: StripeClient;
 }
 
 export function createOrchestratorRouter(opts: OrchestratorRouterOptions = {}): Router {
   const router = Router();
   const authMiddleware = makeAuthMiddleware(opts.verifyJwt);
   const doEnqueueStep = opts.enqueueStep ?? enqueueStep;
+  const doStripe = opts.stripe ?? getStripe();
+
+  // GET /stripe/price
+  // Returns unit_amount + currency for the configured pro price so the frontend
+  // can display the real price without hardcoding it. Public — price info is not secret.
+  router.get("/stripe/price", async (_req: Request, res: Response) => {
+    try {
+      const priceId = process.env.STRIPE_PRO_PRICE_ID;
+      if (!priceId) return res.status(500).json({ error: "STRIPE_PRO_PRICE_ID not configured" });
+      const price = await doStripe.prices.retrieve(priceId);
+      return res.json({ unitAmount: price.unit_amount, currency: price.currency });
+    } catch (err) {
+      return res.status(500).json({ error: (err as Error).message });
+    }
+  });
 
   // Apply auth to all protected route prefixes. /auth/session stays public.
   router.use("/founders", authMiddleware);
@@ -402,6 +421,76 @@ export function createOrchestratorRouter(opts: OrchestratorRouterOptions = {}): 
       });
 
       return res.status(200).json(result);
+    } catch (err) {
+      return res.status(500).json({ error: (err as Error).message });
+    }
+  });
+
+  // POST /founders/:id/checkout
+  // Creates a Stripe Checkout Session for a one-time payment.
+  // Body: { vertical: string }
+  // Returns: { url: string } — the frontend redirects to this URL.
+  router.post("/founders/:id/checkout", async (req: Request, res: Response) => {
+    try {
+      const founderId = String(req.params.id);
+      if (req.founderId !== founderId) {
+        return res.status(403).json({ error: "forbidden" });
+      }
+
+      const { vertical } = (req.body ?? {}) as { vertical?: string };
+      if (!vertical) return res.status(400).json({ error: "vertical is required" });
+      if (!(ALLOWED_VERTICALS as readonly string[]).includes(vertical)) {
+        return res.status(400).json({
+          error: `unknown vertical '${vertical}' — must be one of: ${ALLOWED_VERTICALS.join(", ")}`,
+        });
+      }
+
+      const priceId = process.env.STRIPE_PRO_PRICE_ID;
+      if (!priceId) return res.status(500).json({ error: "STRIPE_PRO_PRICE_ID not configured" });
+
+      const webOrigin = process.env.WEB_ORIGIN ?? "http://localhost:3001";
+
+      const session = await doStripe.checkout.sessions.create({
+        mode: "payment",
+        line_items: [{ price: priceId, quantity: 1 }],
+        metadata: { founderId, vertical },
+        success_url: `${webOrigin}/vertical-request/success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${webOrigin}/vertical-request?canceled=true`,
+      });
+
+      return res.json({ url: session.url });
+    } catch (err) {
+      return res.status(500).json({ error: (err as Error).message });
+    }
+  });
+
+  // GET /founders/:id/checkout-status?session_id=...
+  // Fallback for the success page: polls whether payment landed and whether the
+  // webhook has already created a pipeline_run for this session.
+  // Returns: { paid: boolean, runId: string | null }
+  router.get("/founders/:id/checkout-status", async (req: Request, res: Response) => {
+    try {
+      const founderId = String(req.params.id);
+      if (req.founderId !== founderId) {
+        return res.status(403).json({ error: "forbidden" });
+      }
+
+      const sessionId = String(req.query.session_id ?? "");
+      if (!sessionId) return res.status(400).json({ error: "session_id is required" });
+
+      const [session, run] = await Promise.all([
+        doStripe.checkout.sessions.retrieve(sessionId),
+        prisma.pipelineRun.findUnique({
+          where: { stripeSessionId: sessionId },
+          select: { runId: true, founderId: true },
+        }),
+      ]);
+
+      const paid = session.payment_status === "paid";
+      // Guard: only surface the runId if it belongs to the authenticated founder.
+      const runId = run?.founderId === founderId ? run.runId : null;
+
+      return res.json({ paid, runId: runId ?? null });
     } catch (err) {
       return res.status(500).json({ error: (err as Error).message });
     }
