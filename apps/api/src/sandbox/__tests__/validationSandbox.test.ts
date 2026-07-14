@@ -34,6 +34,26 @@ class GoodMockLLM implements LLMClient {
   }
 }
 
+// Simulates nvidia-nemotron-nano-9b-v2's habit of prepending prose before JSON.
+class ProsePreambleMockLLM implements LLMClient {
+  async complete(): Promise<string> {
+    return (
+      "Based on the candidates provided, here is my classification:\n\n" +
+      JSON.stringify({
+        classified_evidence: [
+          {
+            evidence_id: "candidate-loop-framing",
+            classification: "inconclusive",
+            note: "Loop does market a voluntary-vs-involuntary distinction, but their framing is specifically about payment-failure-driven churn (declined cards, insufficient funds), not the Shop-Pay-card-removal mechanism this hypothesis describes. Topically related, mechanism does not match.",
+          },
+        ],
+        unresolved_questions: [],
+        additional_search_queries_would_run: [],
+      })
+    );
+  }
+}
+
 class HallucinatedMockLLM implements LLMClient {
   async complete(): Promise<string> {
     return JSON.stringify({
@@ -60,6 +80,14 @@ describe("validationSandbox", () => {
     expect(
       good.parsed?.classified_evidence.find((c) => c.evidence_id === "candidate-loop-framing")?.classification
     ).toBe("inconclusive");
+  });
+
+  it("prose preamble before JSON: extractAndClean strips preamble and parses correctly", async () => {
+    const result = await runValidationSandbox(new ProsePreambleMockLLM(), validationInput);
+    expect(result.parsed).not.toBeNull();
+    expect(result.validationErrors.length).toBe(0);
+    expect(result.parsed?.classified_evidence.length).toBe(1);
+    expect(result.parsed?.classified_evidence[0].classification).toBe("inconclusive");
   });
 
   it("hallucinated candidate id: parses but hallucinated citation caught", async () => {

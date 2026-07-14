@@ -70,7 +70,7 @@ Every classification's note MUST explain the actual reasoning — specifically, 
 
 You are NOT scoring or producing a final validation verdict — that's a separate agent's job. You are only classifying and flagging what remains genuinely unresolved.
 
-Respond with ONLY valid JSON matching this exact shape, no other text:
+Respond with ONLY valid JSON matching this exact shape. Your response MUST begin with { and end with }. Do not include any explanation, preamble, commentary, or markdown formatting before or after the JSON object — not even a single word:
 {
   "classified_evidence": [{
     "evidence_id": string,
@@ -96,6 +96,15 @@ export interface ValidationSandboxResult {
   boundedRuleViolations: string[];
 }
 
+// Extract the JSON object from a raw model response, tolerating prose
+// preamble or markdown fences (e.g. "Based on the candidates...\n{...}").
+function extractAndClean(raw: string): string {
+  const first = raw.indexOf("{");
+  const last = raw.lastIndexOf("}");
+  if (first !== -1 && last > first) return raw.slice(first, last + 1);
+  return raw.trim().replace(/^```json\s*/i, "").replace(/```\s*$/, "");
+}
+
 export async function runValidationSandbox(
   llm: LLMClient,
   input: ValidationSandboxInput
@@ -108,7 +117,7 @@ export async function runValidationSandbox(
   const boundedRuleViolations: string[] = [];
 
   try {
-    const cleaned = rawResponse.trim().replace(/^```json\s*/i, "").replace(/```\s*$/, "");
+    const cleaned = extractAndClean(rawResponse);
     const json = JSON.parse(cleaned);
     const result = ValidationOutputSchema.safeParse(json);
     if (!result.success) {
