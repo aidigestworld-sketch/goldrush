@@ -383,6 +383,13 @@ export function createOrchestratorRouter(opts: OrchestratorRouterOptions = {}): 
         retried.push(row.step);
       }
 
+      if (retried.length > 0) {
+        await prisma.pipelineRun.update({
+          where: { runId },
+          data: { status: "running", completedAt: null },
+        });
+      }
+
       return res.status(202).json({ runId, retried });
     } catch (err) {
       return res.status(500).json({ error: (err as Error).message });
