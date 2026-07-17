@@ -241,6 +241,135 @@ describe("expansionSandbox — fabricationStrips counter", () => {
   });
 });
 
+describe("expansionSandbox — experiencing_audience_labels (audience↔problem linkage)", () => {
+  // The whole reason this field exists: pre-2026-07-16 Expansion wrote
+  // audiences and problems as two disconnected sets. Composition then
+  // silently skipped every run for lack of experiences edges (see
+  // compositionAgent.ts:122 and the d84f73a7 run investigation).
+  // These tests pin the sandbox's contract for the new field so a
+  // future refactor can't accidentally regress the linkage discipline.
+
+  const oneDoc = [
+    { id: "doc-101", sourceType: "review_complaint" as const, text: "sample" },
+  ];
+  const oneMarket = "Test market";
+
+  it("valid: labels present and each matches an emitted audience label → no BRV", async () => {
+    class ValidLabelsLLM implements LLMClient {
+      async complete(): Promise<string> {
+        return JSON.stringify({
+          audiences: [
+            { label: "Aud X", description: null, evidence_refs: ["doc-101"] },
+            { label: "Aud Y", description: null, evidence_refs: ["doc-101"] },
+          ],
+          problems: [
+            {
+              label: "No way to X",
+              problem_maturity: "recognized_unsolved",
+              current_workaround_description: null,
+              severity_signal: null,
+              severity_evidence_quote: null,
+              frequency_signal: null,
+              frequency_evidence_quote: null,
+              evidence_refs: ["doc-101"],
+              experiencing_audience_labels: ["Aud X", "Aud Y"],
+            },
+          ],
+        });
+      }
+    }
+    const r = await runExpansionSandbox(new ValidLabelsLLM(), oneDoc, oneMarket);
+    expect(r.parsed).not.toBeNull();
+    expect(r.boundedRuleViolations).toEqual([]);
+    expect(r.parsed?.problems[0].experiencing_audience_labels).toEqual(["Aud X", "Aud Y"]);
+  });
+
+  it("legacy: labels field omitted entirely → still parses, no BRV (agent handles fallback)", async () => {
+    class LegacyOmittedLLM implements LLMClient {
+      async complete(): Promise<string> {
+        return JSON.stringify({
+          audiences: [{ label: "Aud X", description: null, evidence_refs: ["doc-101"] }],
+          problems: [
+            {
+              label: "No way to X",
+              problem_maturity: "recognized_unsolved",
+              current_workaround_description: null,
+              severity_signal: null,
+              severity_evidence_quote: null,
+              frequency_signal: null,
+              frequency_evidence_quote: null,
+              evidence_refs: ["doc-101"],
+              // experiencing_audience_labels intentionally missing
+            },
+          ],
+        });
+      }
+    }
+    const r = await runExpansionSandbox(new LegacyOmittedLLM(), oneDoc, oneMarket);
+    expect(r.parsed).not.toBeNull();
+    expect(r.boundedRuleViolations).toEqual([]);
+    expect(r.parsed?.problems[0].experiencing_audience_labels).toBeUndefined();
+  });
+
+  it("hallucinated: label doesn't match any emitted audience → BRV, response rejected", async () => {
+    class HallucinatedLabelLLM implements LLMClient {
+      async complete(): Promise<string> {
+        return JSON.stringify({
+          audiences: [{ label: "Aud X", description: null, evidence_refs: ["doc-101"] }],
+          problems: [
+            {
+              label: "No way to X",
+              problem_maturity: "recognized_unsolved",
+              current_workaround_description: null,
+              severity_signal: null,
+              severity_evidence_quote: null,
+              frequency_signal: null,
+              frequency_evidence_quote: null,
+              evidence_refs: ["doc-101"],
+              experiencing_audience_labels: ["Aud X", "Nonexistent Audience"],
+            },
+          ],
+        });
+      }
+    }
+    const r = await runExpansionSandbox(new HallucinatedLabelLLM(), oneDoc, oneMarket);
+    expect(r.parsed).not.toBeNull();
+    expect(r.boundedRuleViolations.length).toBe(1);
+    expect(r.boundedRuleViolations[0]).toContain("Nonexistent Audience");
+    expect(r.boundedRuleViolations[0]).toContain("hallucinated audience cross-reference");
+  });
+
+  it("empty labels array (present but []): agent falls back to Cartesian — no BRV at sandbox level", async () => {
+    // The sandbox only fires BRV on hallucinated (non-matching) labels.
+    // An empty array is treated as "model didn't specify" — same as omission
+    // at the sandbox level; the agent handles the fallback.
+    class EmptyLabelsLLM implements LLMClient {
+      async complete(): Promise<string> {
+        return JSON.stringify({
+          audiences: [{ label: "Aud X", description: null, evidence_refs: ["doc-101"] }],
+          problems: [
+            {
+              label: "No way to X",
+              problem_maturity: "recognized_unsolved",
+              current_workaround_description: null,
+              severity_signal: null,
+              severity_evidence_quote: null,
+              frequency_signal: null,
+              frequency_evidence_quote: null,
+              evidence_refs: ["doc-101"],
+              experiencing_audience_labels: [],
+            },
+          ],
+        });
+      }
+    }
+    const r = await runExpansionSandbox(new EmptyLabelsLLM(), oneDoc, oneMarket);
+    expect(r.parsed).not.toBeNull();
+    expect(r.boundedRuleViolations).toEqual([]);
+    expect(r.parsed?.problems[0].experiencing_audience_labels).toEqual([]);
+  });
+});
+
 describe("expansionSandbox — retry path (repair fails → second LLM call succeeds)", () => {
   it("empty first response triggers retry, second call returns valid JSON", async () => {
     const retryLlm = new MalformedThenValidB2BLLM();
@@ -249,5 +378,46 @@ describe("expansionSandbox — retry path (repair fails → second LLM call succ
     expect(afterRetry.validationErrors.length).toBe(0);
     expect(afterRetry.retried).toBe(true);
     expect(retryLlm.getCallCount()).toBe(2);
+  });
+});
+
+// Regression: run f17f7c6d-ab7a-4f11-ae1d-1ffe6424f3fa returned
+// problem_maturity="recognized" twice — a natural-language shortening of
+// "recognized_unsolved". Prior to canonicalizeProblemMaturity() this failed
+// schema validation on both attempts.
+class RecognizedShorthandLLM implements LLMClient {
+  async complete(): Promise<string> {
+    return JSON.stringify({
+      audiences: [
+        {
+          label: "Shopify Subscription-Based Merchants",
+          description: "Merchants using Shopify for subscription-based products/services",
+          evidence_refs: ["doc-101"],
+        },
+      ],
+      problems: [
+        {
+          label: "No way to easily update or manage expiring credit cards for subscriptions through Shop Pay",
+          problem_maturity: "recognized",
+          current_workaround_description: "Manual, time-consuming support calls",
+          severity_signal: 0.8,
+          severity_evidence_quote: "costing them a\nlarge number of customers",
+          frequency_signal: null,
+          frequency_evidence_quote: null,
+          evidence_refs: ["doc-101"],
+          experiencing_audience_labels: ["Shopify Subscription-Based Merchants"],
+        },
+      ],
+    });
+  }
+}
+
+describe("expansionSandbox — problem_maturity canonicalization", () => {
+  it("regression (run f17f7c6d): 'recognized' shorthand is canonicalized to 'recognized_unsolved' rather than rejected", async () => {
+    const result = await runExpansionSandbox(new RecognizedShorthandLLM(), expansionInputDocs, SHOPIFY_MARKET_LABEL);
+    expect(result.validationErrors).toEqual([]);
+    expect(result.parsed).not.toBeNull();
+    expect(result.parsed!.problems[0].problem_maturity).toBe("recognized_unsolved");
+    expect(result.retried).toBe(false);
   });
 });

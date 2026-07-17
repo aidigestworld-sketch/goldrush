@@ -16,8 +16,8 @@
 // open (it could catch a hallucinated *citation* but not a fabricated
 // *number* with no textual grounding at all).
 import { z } from "zod";
-import { jsonrepair } from "jsonrepair";
 import type { LLMClient } from "./llmClient";
+import { parseLlmJson } from "./parseLlmJson";
 
 export interface ExpansionInputDocument {
   id: string;
@@ -35,6 +35,22 @@ const ProblemCandidateSchema = z
     frequency_signal: z.number().min(0).max(1).nullable(),
     frequency_evidence_quote: z.string().nullable(),
     evidence_refs: z.array(z.string()).min(1),
+    // Labels of audiences (from the same response's `audiences[]` array)
+    // that experience this problem. Optional at the SCHEMA level so
+    // legacy fixtures and jsonrepair recoveries of pre-existing NIM
+    // responses still validate; but required in effect via a fallback
+    // in expansionAgent.ts (see the header note about the Composition
+    // experiences-edge gap this closes). When the model omits or leaves
+    // the field empty, the agent falls back to linking the problem to
+    // EVERY audience emitted for the same market — this is a
+    // conservative safe default (the market's audiences are all the
+    // ones the model considered, so all-experience the problem within
+    // that market) that guarantees Composition's 5-role invariant is
+    // satisfiable. When the field IS present, hallucinated labels
+    // (labels that don't match any emitted audience) are caught as
+    // Bounded Rule violations by runExpansionSandbox below — the
+    // sandbox's normal fail-loud-on-hallucination discipline.
+    experiencing_audience_labels: z.array(z.string().min(1)).optional(),
   })
   .refine((p) => p.severity_signal === null || p.severity_evidence_quote !== null, {
     message: "severity_signal set without severity_evidence_quote — violates the observable-proxy invariant",
@@ -77,7 +93,9 @@ Rules you MUST follow exactly:
 - Read ONLY the provided documents. No outside knowledge about ${marketLabel} features not stated in the text.
 - Every audience/problem MUST cite at least one input document id in evidence_refs.
 - If you assign a severity_signal or frequency_signal (0 to 1) to a problem, you MUST also provide the exact short quote (a few words, verbatim from the source text) that justifies it, in severity_evidence_quote / frequency_evidence_quote. If the text does not state anything about how severe or how frequent the problem is, leave both signal and quote as null — do NOT estimate from general impression.
+- For every problem you emit, populate "experiencing_audience_labels" with the exact label strings (from your own audiences[] array) of the audiences that experience this problem. This is the audience↔problem linkage the downstream Composition step needs to assemble a scorable opportunity — a problem with no audiences declared cannot be scored. If a single audience experiences every problem in the market (common for narrow verticals), list that one label on every problem.
 - Do not rank or recommend solutions. Structure only.
+- The "problem_maturity" field MUST be exactly one of these three literal strings, copied verbatim including underscores: "unrecognized", "recognized_unsolved", "partially_solved". Do NOT abbreviate (e.g. do not write "recognized" as a shorthand for "recognized_unsolved"), do not paraphrase, do not translate — the downstream schema rejects anything else.
 
 Respond with ONLY valid JSON matching this exact shape, no other text:
 {
@@ -90,7 +108,8 @@ Respond with ONLY valid JSON matching this exact shape, no other text:
     "severity_evidence_quote": string | null,
     "frequency_signal": number | null,
     "frequency_evidence_quote": string | null,
-    "evidence_refs": string[]
+    "evidence_refs": string[],
+    "experiencing_audience_labels": string[]
   }]
 }`;
 }
@@ -103,6 +122,31 @@ const RETRY_SUFFIX =
   "fences, and never embed literal newline or control characters inside string values " +
   "(escape them as \\n if needed).";
 
+// Observed in prod (run f17f7c6d…): the model repeatedly serialised
+// "recognized" as a natural-language shortening of the schema value
+// "recognized_unsolved" — same input yielded "recognized" twice, then
+// "recognized_unsolved" on retry. Map the known aliases (case- and
+// whitespace-insensitive) rather than failing the whole response. Genuine
+// unknown values still fall through to schema rejection.
+const PROBLEM_MATURITY_ALIASES: Record<string, "unrecognized" | "recognized_unsolved" | "partially_solved"> = {
+  recognized: "recognized_unsolved",
+  unsolved: "recognized_unsolved",
+  recognized_but_unsolved: "recognized_unsolved",
+  "partially solved": "partially_solved",
+  partial: "partially_solved",
+  unknown: "unrecognized",
+  unacknowledged: "unrecognized",
+};
+
+function canonicalizeProblemMaturity(value: unknown): unknown {
+  if (typeof value !== "string") return value;
+  const normalized = value.trim().toLowerCase().replace(/[-\s]+/g, "_");
+  if (normalized === "unrecognized" || normalized === "recognized_unsolved" || normalized === "partially_solved") {
+    return normalized;
+  }
+  return PROBLEM_MATURITY_ALIASES[normalized] ?? PROBLEM_MATURITY_ALIASES[value.trim().toLowerCase()] ?? value;
+}
+
 // Pre-validation normalization: enforce observable-proxy invariant by stripping
 // any signal field whose matching quote field is absent, rather than letting
 // schema validation reject the entire response. This is more reliable than
@@ -110,6 +154,7 @@ const RETRY_SUFFIX =
 // signals based on semantic inference from the source text but don't always
 // copy the exact verbatim phrase as required. Stripping the signal preserves
 // the problem (with null signals) rather than discarding the entire response.
+// Also canonicalises problem_maturity synonyms (see canonicalizeProblemMaturity).
 function normalizeSignals(raw: unknown): unknown {
   if (typeof raw !== "object" || raw === null) return raw;
   const obj = raw as Record<string, unknown>;
@@ -118,6 +163,7 @@ function normalizeSignals(raw: unknown): unknown {
     ...obj,
     problems: (obj.problems as Record<string, unknown>[]).map((p) => ({
       ...p,
+      problem_maturity: canonicalizeProblemMaturity(p.problem_maturity),
       severity_signal: p.severity_evidence_quote != null ? p.severity_signal : null,
       frequency_signal: p.frequency_evidence_quote != null ? p.frequency_signal : null,
     })),
@@ -131,35 +177,16 @@ function buildUserPrompt(documents: ExpansionInputDocument[]): string {
   return `Here are the documents:\n\n${docBlocks}`;
 }
 
-// Extract the JSON object from a raw model response, tolerating prose
-// preamble or markdown fences (e.g. "Here is the JSON:\n```\n{...}").
-function extractAndClean(raw: string): string {
-  const first = raw.indexOf("{");
-  const last = raw.lastIndexOf("}");
-  if (first !== -1 && last > first) return raw.slice(first, last + 1);
-  return raw.trim().replace(/^```json\s*/i, "").replace(/```\s*$/, "");
-}
-
-// Try to produce a parsed JS value from a raw model response.
-// Attempts native JSON.parse first, then falls back to jsonrepair for
-// common NIM model output issues (unescaped literal newlines in string
-// fields, trailing commas, partial truncation). Returns null only when
-// both native parse and repair both fail.
+// Try to produce a parsed JS value from a raw model response. Delegates
+// to the shared parseLlmJson helper so every LLM-facing sandbox uses
+// the same recovery path (native JSON.parse → jsonrepair fallback).
+// Returns null when both native parse AND jsonrepair fail — kept as
+// null-not-error for compat with the existing Expansion retry logic
+// below that already branches on this.
 function tryParse(raw: string): { data: unknown; repaired: boolean } | null {
-  const cleaned = extractAndClean(raw);
-
-  try {
-    return { data: JSON.parse(cleaned), repaired: false };
-  } catch {
-    // fall through to repair
-  }
-
-  try {
-    const fixed = jsonrepair(cleaned);
-    return { data: JSON.parse(fixed), repaired: true };
-  } catch {
-    return null;
-  }
+  const result = parseLlmJson(raw);
+  if (result.error) return null;
+  return { data: result.data, repaired: result.repaired };
 }
 
 export interface ExpansionSandboxResult {
@@ -270,10 +297,26 @@ export async function runExpansionSandbox(
         };
 
         for (const a of parsed.audiences) checkRefs(a.label, a.evidence_refs);
+        // Any experiencing_audience_labels the model DID supply must
+        // resolve to a real audience label emitted in this same response.
+        // A label that doesn't match is a hallucinated cross-reference —
+        // treat it the same way we treat hallucinated evidence_refs
+        // (fail loud, no partial output). The agent's Cartesian
+        // fallback for absent labels is a separate concern from the
+        // present-but-invalid case handled here.
+        const audienceLabels = new Set(parsed.audiences.map((a) => a.label));
         for (const p of problems) {
           checkRefs(p.label, p.evidence_refs);
           stripIfUngrounded(p, p.severity_evidence_quote, "severity");
           stripIfUngrounded(p, p.frequency_evidence_quote, "frequency");
+          if (p.experiencing_audience_labels && p.experiencing_audience_labels.length > 0) {
+            const bad = p.experiencing_audience_labels.filter((l) => !audienceLabels.has(l));
+            if (bad.length > 0) {
+              boundedRuleViolations.push(
+                `problem "${p.label}" cites experiencing_audience_labels not present in the audiences[] array: ${bad.join(", ")} — hallucinated audience cross-reference`
+              );
+            }
+          }
         }
       }
     } catch (err) {

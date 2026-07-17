@@ -53,14 +53,19 @@ async function makeFounder(authUserId: string): Promise<string> {
 }
 
 async function seedPromotedOpportunity(runId: string): Promise<string> {
+  // Realistic scales: founderFitScore is stored 0-100 (per FounderFit
+  // sandbox schema); ventureScore + confidenceScore are 0-1. The API
+  // normalises founderFitScore to 0-1 at the boundary so the frontend
+  // can render all three scores with the same uniform (value * 100)%
+  // formula.
   const candidate = await prisma.opportunityCandidate.create({
-    data: { runId, ventureScore: 0.82, founderFitScore: 0.71, confidenceScore: 0.68, status: "promoted" },
+    data: { runId, ventureScore: 0.82, founderFitScore: 71, confidenceScore: 0.68, status: "promoted" },
   });
   createdCandidateIds.push(candidate.id);
   const opp = await prisma.opportunity.create({
     data: {
       promotedFromCandidateId: candidate.id,
-      ventureScore: 0.82, founderFitScore: 0.71, confidenceScore: 0.68,
+      ventureScore: 0.82, founderFitScore: 71, confidenceScore: 0.68,
       rationaleBullets: ["Strong market pull in underserved segment", "Defensible distribution"],
       riskSummary: ["Regulatory uncertainty"],
     },
@@ -181,9 +186,14 @@ describe("GET /founders/:id/runs", () => {
     expect(runCEntry?.opportunity).not.toBeNull();
 
     const opp = runCEntry?.opportunity as Record<string, unknown> | null;
-    expect(typeof opp?.ventureScore).toBe("number");
-    expect(typeof opp?.confidenceScore).toBe("number");
-    expect(typeof opp?.founderFitScore).toBe("number");
+    // Regression for the 4000% display bug (seen in prod for run
+    // f17f7c6d with a stored founderFitScore=40 rendering as 4000%
+    // via the frontend's uniform value*100 formatter). The API
+    // MUST normalise the DB's 0-100 scale to 0-1 at this boundary.
+    // Seed above stores 71 → API MUST return 0.71.
+    expect(opp?.ventureScore).toBe(0.82);
+    expect(opp?.confidenceScore).toBe(0.68);
+    expect(opp?.founderFitScore).toBeCloseTo(0.71, 5);
     expect(opp?.headline).toBe("Strong market pull in underserved segment");
 
     const runA1Entry = bodyC.find((r) => r.runId === runA1) as Record<string, unknown> | undefined;

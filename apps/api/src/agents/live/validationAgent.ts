@@ -55,7 +55,7 @@
 // to count AFTER the writes (or subtract the createMany result's
 // count from the pre-write intent) rather than trust the
 // classifier picks as the mutation count.
-import { runValidationSandbox, type ValidationCandidateEvidence } from "../../sandbox/validationSandbox";
+import { runValidationSandboxBatched, type ValidationCandidateEvidence } from "../../sandbox/validationSandbox";
 import type { LLMClient } from "../../sandbox/llmClient";
 import { hypothesisRepository } from "../../repositories/hypothesis.repository";
 import { nodeSourceRefRepository } from "../../repositories/nodeSourceRef.repository";
@@ -65,6 +65,8 @@ import type { NormalizedEvidence } from "../../pipeline/types";
 import type { HypothesisSearchLogPayload } from "../../pipeline/searchForHypothesisEvidence";
 import { prisma } from "../../db/client";
 import { pairInsertedEvidenceByUrl } from "./validationEvidencePairing";
+import { tryResolveHypothesisIdForRun } from "../../orchestrator/idResolvers";
+import { selectWithinTokenBudget, getInputTokenBudgetForAgent } from "../../sandbox/tokenBudget";
 
 export interface ValidationRunResult {
   newSupportingCitations: number;
@@ -108,13 +110,30 @@ export interface RunValidationAgentOptions {
   dryRun?: boolean;
 }
 
+// hypothesisId is `string | undefined` (not required). If no hypothesis
+// exists for the run (upstream Hypothesis legitimately skipped because
+// Discovery wrote zero markets, etc.) the agent skips cleanly — matches
+// the tryResolve* pattern used by problem/candidate-based agents so a
+// legitimate partial-completion doesn't flip pipeline_run.status to
+// 'failed' with a confusing "no active hypothesis" error.
 export async function runValidationAgent(
   runId: string,
-  hypothesisId: string,
+  hypothesisId: string | undefined,
   llm: LLMClient,
   options: RunValidationAgentOptions = {}
 ): Promise<ValidationRunResult> {
-  const hypothesis = await hypothesisRepository.findById(hypothesisId);
+  const resolvedHypothesisId = await tryResolveHypothesisIdForRun(runId, hypothesisId);
+  if (!resolvedHypothesisId) {
+    return {
+      newSupportingCitations: 0,
+      newContradictingCitations: 0,
+      newUnresolvedQuestions: 0,
+      boundedRuleViolations: [],
+      skipped: true,
+      skipReason: "no active hypothesis for run — upstream Hypothesis step produced no row",
+    };
+  }
+  const hypothesis = await hypothesisRepository.findById(resolvedHypothesisId);
   if (!hypothesis || hypothesis.status !== "active") {
     return {
       newSupportingCitations: 0,
@@ -122,7 +141,7 @@ export async function runValidationAgent(
       newUnresolvedQuestions: 0,
       boundedRuleViolations: [],
       skipped: true,
-      skipReason: `hypothesis ${hypothesisId} not found or not active`,
+      skipReason: `hypothesis ${resolvedHypothesisId} not found or not active`,
     };
   }
 
@@ -144,10 +163,21 @@ export async function runValidationAgent(
     },
   });
 
-  const corpusCandidates: ValidationCandidateEvidence[] = uncitedEvidence.map((e) => ({
+  // Preserve sourceType + recency alongside each candidate so
+  // selectWithinTokenBudget can rank the combined corpus (see below)
+  // by source authority + recency. The sandbox itself only needs
+  // {id, sourceUrlOrIdentifier, text} — we strip the extra fields
+  // after budget selection.
+  type CandidateWithMeta = ValidationCandidateEvidence & {
+    sourceType: string;
+    recencyAt: Date | null;
+  };
+  const corpusCandidates: CandidateWithMeta[] = uncitedEvidence.map((e) => ({
     id: e.id,
     sourceUrlOrIdentifier: e.sourceUrlOrIdentifier,
     text: e.extractedFact,
+    sourceType: e.sourceType,
+    recencyAt: e.sourcePublishedAt ?? e.fetchedAt ?? null,
   }));
 
   // Active-search step (§6 invariant). Runs BEFORE classification when
@@ -191,7 +221,7 @@ export async function runValidationAgent(
   // permitted per §20.2 because the actual retrieval + normalization
   // happened in Data Pipeline (searchProvider); this agent is just
   // committing the pipeline's output.
-  const searchCandidates: ValidationCandidateEvidence[] = [];
+  const searchCandidates: CandidateWithMeta[] = [];
   if (retrievedNormalizedEvidence.length > 0) {
     // Tag the newly-fetched evidence with this run's vertical — search
     // is initiated per-run, so its results are per-vertical by
@@ -226,16 +256,31 @@ export async function runValidationAgent(
     // papered over with a placeholder id, which used to forward a
     // non-existent evidence_id into node_source_refs and trip the FK.
     const paired = pairInsertedEvidenceByUrl(retrievedNormalizedEvidence, inserted);
-    searchCandidates.push(...paired.candidates);
+    // Tag every search-retrieved candidate as search_signal + fetched-now
+    // for the token-budget ranker below. Both are true by construction:
+    // the evidenceRepository.createMany call above always writes
+    // sourceType='search_signal', and the just-inserted row's fetchedAt
+    // is this instant. Also cross-reference the inserted rows to grab
+    // the actual DB fetchedAt (accurate to the millisecond) rather than
+    // recomputing new Date() here — same principle as pairInsertedEvidenceByUrl
+    // (don't fabricate what the DB already knows).
+    const insertedById = new Map(inserted.map((r) => [r.id, r]));
+    for (const c of paired.candidates) {
+      searchCandidates.push({
+        ...c,
+        sourceType: "search_signal",
+        recencyAt: insertedById.get(c.id)?.fetchedAt ?? new Date(),
+      });
+    }
     for (const url of paired.droppedUrls) {
       console.warn(
         `[validationAgent] dropping search-retrieved evidence — no DB row found for ${url} in vertical ${runForVertical.vertical}`
       );
     }
   }
-  const candidates: ValidationCandidateEvidence[] = [...corpusCandidates, ...searchCandidates];
+  const combinedCandidates: CandidateWithMeta[] = [...corpusCandidates, ...searchCandidates];
 
-  if (candidates.length === 0) {
+  if (combinedCandidates.length === 0) {
     return {
       newSupportingCitations: 0,
       newContradictingCitations: 0,
@@ -249,13 +294,58 @@ export async function runValidationAgent(
     };
   }
 
+  // Token-budget selection over corpus + search-retrieved candidates,
+  // same pattern as Discovery / Expansion / CompetitiveAnalysis.
+  // Prevents the input-token-overflow class that hit this agent on
+  // 2026-07-16 (114689 input tokens against nvidia/llama-3.3-nemotron-
+  // super-49b-v1's 131072 ceiling, model context reserved 16384 for
+  // output → over the limit). Validation reads *all* uncited active
+  // evidence in the vertical, so its corpus scales the same way
+  // Discovery's does — the same fix pattern applies.
+  //
+  // Budget is per-AGENT+model, not just per-model: Validation on the
+  // super-49b model gets a tighter 75K budget (vs the model-wide 105K)
+  // to reduce NIM gateway pressure — the shared upstream started
+  // returning 504 gateway timeouts consistently at ~105K input on
+  // 2026-07-16. Trades ~25% fewer classified candidates (the
+  // lowest-authority + oldest, already deprioritized by the ranker)
+  // for a meaningful drop in prefill time. Other agents on the same
+  // model keep 105K. See tokenBudget.ts for the override table.
+  const modelId = (llm as { model?: string }).model;
+  const budgetResult = selectWithinTokenBudget(
+    combinedCandidates.map((c) => ({
+      id: c.id,
+      sourceType: c.sourceType,
+      text: c.text,
+      recencyAt: c.recencyAt,
+    })),
+    getInputTokenBudgetForAgent("Validation", modelId)
+  );
+  if (budgetResult.droppedCount > 0) {
+    console.warn(
+      `[Validation] token-budget: kept ${budgetResult.selected.length}/${combinedCandidates.length} evidence rows ` +
+        `(~${budgetResult.totalTokensEstimated} tokens, budget=${budgetResult.budgetTokens}), ` +
+        `dropped by source_type: ${JSON.stringify(budgetResult.droppedBySourceType)}`
+    );
+  }
+  const selectedIds = new Set(budgetResult.selected.map((s) => s.id));
+  const candidates: ValidationCandidateEvidence[] = combinedCandidates
+    .filter((c) => selectedIds.has(c.id))
+    .map((c) => ({ id: c.id, sourceUrlOrIdentifier: c.sourceUrlOrIdentifier, text: c.text }));
+
   return agentExecutionLogService.run(
     { runId, agentName: "Validation", candidateId: null, modelUsed: (llm as { model?: string }).model ?? null },
-    async () => {
-      const result = await runValidationSandbox(llm, {
+    async (ctx) => {
+      // Batched: splits into ≤60-row chunks and runs them in parallel
+      // to avoid the ~300s NIM gateway wall the single-call path hit
+      // on 2026-07-17 at 131 rows / 8192 output tokens (finish=length).
+      // See runValidationSandboxBatched header for the safety argument
+      // (per-row classification is independent → concat is correct).
+      const result = await runValidationSandboxBatched(llm, {
         hypothesis: { id: hypothesis.id, statement: hypothesis.statement },
         candidates,
       });
+      ctx.setRawOutput(result.rawResponse);
 
       if (!result.parsed) {
         throw new Error(`Validation Agent output failed schema validation: ${result.validationErrors.join("; ")}`);

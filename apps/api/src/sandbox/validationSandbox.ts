@@ -25,6 +25,7 @@
 // the mechanism doesn't actually match.
 import { z } from "zod";
 import type { LLMClient } from "./llmClient";
+import { parseLlmJson } from "./parseLlmJson";
 
 export interface ValidationHypothesis {
   id: string;
@@ -96,15 +97,10 @@ export interface ValidationSandboxResult {
   boundedRuleViolations: string[];
 }
 
-// Extract the JSON object from a raw model response, tolerating prose
-// preamble or markdown fences (e.g. "Based on the candidates...\n{...}").
-function extractAndClean(raw: string): string {
-  const first = raw.indexOf("{");
-  const last = raw.lastIndexOf("}");
-  if (first !== -1 && last > first) return raw.slice(first, last + 1);
-  return raw.trim().replace(/^```json\s*/i, "").replace(/```\s*$/, "");
-}
-
+// One-call classification (used directly by tests and internally by
+// runValidationSandboxBatched below). Prefer runValidationSandboxBatched
+// for production paths so corpora larger than ~60 rows don't push a
+// single LLM call past NIM's ~300s inference gateway wall.
 export async function runValidationSandbox(
   llm: LLMClient,
   input: ValidationSandboxInput
@@ -116,10 +112,15 @@ export async function runValidationSandbox(
   const validationErrors: string[] = [];
   const boundedRuleViolations: string[] = [];
 
-  try {
-    const cleaned = extractAndClean(rawResponse);
-    const json = JSON.parse(cleaned);
-    const result = ValidationOutputSchema.safeParse(json);
+  // parseLlmJson tries native JSON.parse first, falls back to jsonrepair
+  // if the model emitted a truncated / unescaped-quote / missing-bracket
+  // response. Recovers the 07:34 UTC 2026-07-15 Validation failure
+  // (log 60f84683-...) which was a mid-string truncation.
+  const parseResult = parseLlmJson(rawResponse);
+  if (parseResult.error) {
+    validationErrors.push(parseResult.error);
+  } else {
+    const result = ValidationOutputSchema.safeParse(parseResult.data);
     if (!result.success) {
       validationErrors.push(result.error.toString());
     } else {
@@ -133,9 +134,98 @@ export async function runValidationSandbox(
         }
       }
     }
-  } catch (err) {
-    validationErrors.push(`JSON parse failed: ${(err as Error).message}`);
   }
 
   return { rawResponse, parsed, validationErrors, boundedRuleViolations };
+}
+
+// Max candidate rows per single LLM call. Chosen empirically from the
+// 2026-07-17 diagnostic: 131 rows at ~75K input + 8192 output tokens on
+// nvidia/llama-3.3-nemotron-super-49b-v1.5 ran 289s (finish=length),
+// right at the 300s NIM gateway wall. Splitting into batches of ≤60
+// rows keeps per-batch output well under 4K tokens (~60 rows × ~60
+// tokens/row for classification+note) and per-batch input well under
+// ~40K tokens, which finishes in ~90–150s per parallel batch — durable
+// as the corpus grows because the batch COUNT scales with volume, not
+// per-batch time.
+export const VALIDATION_MAX_ROWS_PER_BATCH = 60;
+
+// Batched classification. Splits input.candidates into ≤VALIDATION_MAX_ROWS_PER_BATCH
+// chunks, runs runValidationSandbox in parallel per chunk, merges results.
+//
+// Design invariants:
+//   - Single hypothesis is passed to every batch — batches partition
+//     ONLY candidates, never the hypothesis or the system prompt.
+//   - Per-batch classification is independent: the classifier is a
+//     per-row judgment against a fixed hypothesis, with no cross-row
+//     reasoning. Concatenating classified_evidence across batches is
+//     therefore semantically equivalent to a single call. This is the
+//     property that makes batching safe for quality.
+//   - Fail-loud: if ANY batch fails schema validation, the whole
+//     invocation fails (validationErrors non-empty, parsed=null) —
+//     partial-success writes would corrupt the audit trail.
+//   - rawResponse is a concatenation of per-batch raw responses with
+//     an inline delimiter, so agent_execution_log.raw_output remains
+//     a single string per Validation run but each batch's raw output
+//     is inspectable in the log.
+//   - unresolved_questions and additional_search_queries_would_run are
+//     merged with de-duplication (case-insensitive, whitespace-normalized) —
+//     different batches often surface the same broad gap in the corpus,
+//     and duplicating those onto hypothesis.missing_data or the search
+//     log would be noise.
+export async function runValidationSandboxBatched(
+  llm: LLMClient,
+  input: ValidationSandboxInput,
+  batchSize: number = VALIDATION_MAX_ROWS_PER_BATCH
+): Promise<ValidationSandboxResult> {
+  if (input.candidates.length <= batchSize) {
+    return runValidationSandbox(llm, input);
+  }
+
+  const batches: ValidationCandidateEvidence[][] = [];
+  for (let i = 0; i < input.candidates.length; i += batchSize) {
+    batches.push(input.candidates.slice(i, i + batchSize));
+  }
+
+  const perBatch = await Promise.all(
+    batches.map((candidates) =>
+      runValidationSandbox(llm, { hypothesis: input.hypothesis, candidates })
+    )
+  );
+
+  const rawResponse = perBatch
+    .map((r, i) => `--- batch ${i + 1}/${perBatch.length} ---\n${r.rawResponse}`)
+    .join("\n\n");
+
+  const validationErrors = perBatch.flatMap((r, i) =>
+    r.validationErrors.map((e) => `[batch ${i + 1}/${perBatch.length}] ${e}`)
+  );
+  const boundedRuleViolations = perBatch.flatMap((r) => r.boundedRuleViolations);
+
+  if (validationErrors.length > 0 || perBatch.some((r) => r.parsed === null)) {
+    return { rawResponse, parsed: null, validationErrors, boundedRuleViolations };
+  }
+
+  const dedupe = (values: string[]): string[] => {
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const v of values) {
+      const key = v.trim().toLowerCase().replace(/\s+/g, " ");
+      if (!seen.has(key)) {
+        seen.add(key);
+        out.push(v);
+      }
+    }
+    return out;
+  };
+
+  const merged: ValidationOutput = {
+    classified_evidence: perBatch.flatMap((r) => r.parsed!.classified_evidence),
+    unresolved_questions: dedupe(perBatch.flatMap((r) => r.parsed!.unresolved_questions)),
+    additional_search_queries_would_run: dedupe(
+      perBatch.flatMap((r) => r.parsed!.additional_search_queries_would_run)
+    ),
+  };
+
+  return { rawResponse, parsed: merged, validationErrors, boundedRuleViolations };
 }

@@ -10,7 +10,7 @@ function ScoreChip({
   testId,
 }: {
   label: string;
-  value: number;
+  value: number | null;
   testId: string;
 }) {
   return (
@@ -19,11 +19,26 @@ function ScoreChip({
       data-testid={testId}
     >
       <span className="text-xl font-bold tabular-nums text-gray-900">
-        {Math.round(value * 100)}%
+        {value == null ? "—" : `${Math.round(value * 100)}%`}
       </span>
       <span className="mt-0.5 text-xs text-gray-500">{label}</span>
     </div>
   );
+}
+
+// Human-readable translation of compression's deprecationReason strings.
+// See src/agents/compression.ts (backend) for the source of these values.
+function explainDeprecation(reason: string | null): string | null {
+  switch (reason) {
+    case "failed_gate":
+      return "Founder-fit fell below the minimum threshold required for promotion";
+    case "lost_tiebreak":
+      return "Ranked below another candidate in the tiebreak";
+    case "incomplete_composition":
+      return "Missing required composition slots — not all roles were filled";
+    default:
+      return reason;
+  }
 }
 
 interface Props {
@@ -32,7 +47,13 @@ interface Props {
 }
 
 export default function RunResultView({ result, runId }: Props) {
-  const { vertical, opportunity } = result;
+  const { vertical, opportunity, candidates } = result;
+  // "Evaluated but not promoted": no winner AND at least one candidate row
+  // exists in the run. Distinguished from the "no candidates ever composed"
+  // case (empty candidates[]) so we can show real scored detail versus a
+  // simpler honest message.
+  const evaluatedNotPromoted = opportunity === null && candidates.length > 0;
+  const noCandidatesEver = opportunity === null && candidates.length === 0;
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-10" data-testid="run-result-view">
@@ -43,7 +64,69 @@ export default function RunResultView({ result, runId }: Props) {
         ← Back to status
       </Link>
 
-      {opportunity === null ? (
+      {evaluatedNotPromoted ? (
+        <div className="mt-2" data-testid="evaluated-not-promoted-state">
+          <div className="mb-8">
+            <h1 className="text-2xl font-bold leading-snug text-gray-900" data-testid="not-promoted-headline">
+              No opportunity cleared the bar
+            </h1>
+            {vertical && (
+              <p className="mt-1 text-sm text-gray-500">{formatVertical(vertical)}</p>
+            )}
+            <p className="mt-3 max-w-2xl text-sm text-gray-600">
+              We evaluated {candidates.length === 1 ? "one candidate" : `${candidates.length} candidates`} for this run.
+              Below is the scored detail and rationale for each — none were promoted, but the analysis produced real evidence you can act on.
+            </p>
+          </div>
+
+          <div className="space-y-8" data-testid="candidates-list">
+            {candidates.map((c, i) => {
+              const reason = explainDeprecation(c.deprecationReason);
+              return (
+                <section
+                  key={c.id}
+                  className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm"
+                  data-testid={`candidate-card-${i}`}
+                >
+                  <div className="mb-4 grid grid-cols-3 gap-3" data-testid={`candidate-scores-${i}`}>
+                    <ScoreChip label="Quality" value={c.opportunityQuality} testId={`candidate-${i}-score-quality`} />
+                    <ScoreChip label="Confidence" value={c.confidenceScore} testId={`candidate-${i}-score-confidence`} />
+                    <ScoreChip label="Founder Fit" value={c.founderFitScore} testId={`candidate-${i}-score-founder-fit`} />
+                  </div>
+
+                  {c.ventureScore === null && reason && (
+                    <div
+                      className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+                      data-testid={`candidate-${i}-gate-reason`}
+                    >
+                      <span className="font-semibold">Not promoted:</span> {reason}
+                    </div>
+                  )}
+
+                  {c.founderFitRationale && (
+                    <div data-testid={`candidate-${i}-founder-fit-rationale`}>
+                      <h3 className="mb-2 text-xs font-semibold uppercase tracking-widest text-gray-400">
+                        Founder-fit rationale
+                      </h3>
+                      <p className="whitespace-pre-wrap text-sm leading-relaxed text-gray-800">
+                        {c.founderFitRationale}
+                      </p>
+                    </div>
+                  )}
+                </section>
+              );
+            })}
+          </div>
+
+          <Link
+            href={`/runs/${runId}`}
+            className="mt-8 inline-block text-sm text-blue-600 hover:underline"
+            data-testid="back-to-status-link"
+          >
+            View analysis steps →
+          </Link>
+        </div>
+      ) : noCandidatesEver ? (
         <div
           className="mt-6 rounded-xl border border-gray-200 bg-white p-10 text-center shadow-sm"
           data-testid="no-opportunity-state"
@@ -65,10 +148,10 @@ export default function RunResultView({ result, runId }: Props) {
               />
             </svg>
           </div>
-          <h2 className="text-lg font-semibold text-gray-900">No opportunity promoted</h2>
+          <h2 className="text-lg font-semibold text-gray-900">No scorable opportunity identified</h2>
           <p className="mx-auto mt-2 max-w-sm text-sm text-gray-500">
-            Analysis complete — no opportunity cleared the bar
-            {vertical ? ` for ${formatVertical(vertical)}` : ""}.
+            The available evidence for {vertical ? formatVertical(vertical) : "this vertical"} didn&apos;t
+            support composing a candidate to score. Try refining your inputs or running again after new evidence lands.
           </p>
           <Link
             href={`/runs/${runId}`}
@@ -78,7 +161,7 @@ export default function RunResultView({ result, runId }: Props) {
             View analysis steps →
           </Link>
         </div>
-      ) : (
+      ) : opportunity ? (
         <div className="mt-2">
           {/* Document header */}
           <div className="mb-8">
@@ -168,7 +251,7 @@ export default function RunResultView({ result, runId }: Props) {
             </ul>
           </section>
         </div>
-      )}
+      ) : null}
     </main>
   );
 }

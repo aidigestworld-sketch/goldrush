@@ -94,15 +94,48 @@ export interface OpportunityDetail {
   riskSummary: string[];
 }
 
+/**
+ * Per-candidate scoring detail — surfaced for both the promoted winner
+ * (redundant with `opportunity` in that case) and every non-promoted
+ * candidate so the "no promotion" result view can show real evaluated
+ * data instead of a generic "nothing cleared the bar" message.
+ *
+ * All numeric scores are on the 0-1 scale (the API normalises
+ * founderFitScore's stored 0-100 to 0-1 at the boundary).
+ *
+ * `deprecationReason`:
+ *   - "failed_gate"           — founder-fit below the min threshold
+ *   - "lost_tiebreak"         — lost the tie-break to another candidate
+ *   - "incomplete_composition"— missing required composition slots
+ *   - null                    — either promoted or still status="candidate"
+ */
+export interface EvaluatedCandidate {
+  id: string;
+  status: string;
+  opportunityQuality: number | null;
+  confidenceScore: number | null;
+  founderFitScore: number | null;
+  ventureScore: number | null;
+  founderFitRationale: string | null;
+  deprecationReason: string | null;
+  confidenceCoverageGate: boolean | null;
+  incompleteComposition: boolean | null;
+}
+
 export interface RunResult {
   runId: string;
   overall: RunOverallStatus;
+  /** Raw pipeline_run.status — distinguishes "insufficient_evidence" (candidates
+   *  existed but none passed the gate) from a plain "completed" (winner promoted). */
+  runStatus: string;
   vertical: string;
   /**
    * null when overall !== "completed", OR when the run completed but
    * Compression found no candidate above the bar (no promotion happened).
    */
   opportunity: OpportunityDetail | null;
+  /** Every candidate row for the run — empty when zero candidates ever composed. */
+  candidates: EvaluatedCandidate[];
 }
 
 export async function getRunResult(runId: string, accessToken?: string): Promise<RunResult> {

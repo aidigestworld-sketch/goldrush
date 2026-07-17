@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import RunResultView from "../components/RunResultView";
-import type { RunResult, OpportunityDetail } from "../lib/api";
+import type { RunResult, OpportunityDetail, EvaluatedCandidate } from "../lib/api";
 
 // ── Mock setup ───────────���────────────────────────────────────────────────
 
@@ -58,18 +58,54 @@ const FULL_OPPORTUNITY: OpportunityDetail = {
 
 function makeResult(
   overall: RunResult["overall"],
-  opportunity: OpportunityDetail | null = FULL_OPPORTUNITY
+  opportunity: OpportunityDetail | null = FULL_OPPORTUNITY,
+  candidates: EvaluatedCandidate[] = [],
+  runStatus: string = overall === "completed" ? "completed" : overall
 ): RunResult {
   return {
     runId: "run-result-1",
     overall,
+    runStatus,
     vertical: "shopify_subscriptions",
     opportunity,
+    candidates,
   };
 }
 
-const COMPLETED = makeResult("completed");
-const COMPLETED_NO_OPP = makeResult("completed", null);
+// Real numbers from run aae43d53-09f5-441d-92b5-e5d05154198c (the
+// 2026-07-17 shopify_subscriptions run that produced ONE scored
+// candidate that was gated out on min-founder-fit). Used as the
+// canonical fixture for the "evaluated but not promoted" case.
+const AAE43D53_CANDIDATE: EvaluatedCandidate = {
+  id: "aae43d53-cand-1",
+  status: "deprecated",
+  opportunityQuality: 0.46,
+  confidenceScore: 1.0,
+  founderFitScore: 0.20, // stored 20/100, normalised at API boundary
+  ventureScore: null,     // null because min-fit gate blocked venture calc
+  founderFitRationale:
+    "Founder's background is in adjacent SaaS but lacks direct experience with subscription-billing merchants. The specific dunning/win-back mechanism the hypothesis targets requires operator familiarity we couldn't confirm from the profile.",
+  deprecationReason: "failed_gate",
+  confidenceCoverageGate: true,
+  incompleteComposition: false,
+};
+
+const COMPLETED = makeResult("completed", FULL_OPPORTUNITY, [
+  // Include the promoted candidate too — the real API returns every candidate row.
+  {
+    id: "promoted-1", status: "promoted",
+    opportunityQuality: 0.72, confidenceScore: 0.74, founderFitScore: 0.69,
+    ventureScore: 0.82, founderFitRationale: FULL_OPPORTUNITY.founderFitRationale,
+    deprecationReason: null, confidenceCoverageGate: true, incompleteComposition: false,
+  },
+]);
+const COMPLETED_NO_OPP = makeResult("completed", null); // no candidates → "no scorable" state
+const COMPLETED_EVAL_NOT_PROMOTED = makeResult(
+  "completed",
+  null,
+  [AAE43D53_CANDIDATE],
+  "insufficient_evidence"
+);
 const IN_PROGRESS = makeResult("in_progress", null);
 const FAILED = makeResult("failed", null);
 
@@ -187,14 +223,14 @@ describe("RunResultView — score formatting", () => {
   });
 });
 
-// ── RunResultView — no opportunity promoted (empty state) ─────────────────
+// ── RunResultView — zero candidates ever composed (honest empty state) ────
 
-describe("RunResultView — no opportunity promoted", () => {
+describe("RunResultView — zero candidates ever composed", () => {
   beforeEach(() => {
     render(<RunResultView result={COMPLETED_NO_OPP} runId="run-result-1" />);
   });
 
-  it("renders the no-opportunity state container", () => {
+  it("renders the no-scorable-opportunity state container", () => {
     expect(screen.getByTestId("no-opportunity-state")).toBeInTheDocument();
   });
 
@@ -204,9 +240,11 @@ describe("RunResultView — no opportunity promoted", () => {
     );
   });
 
-  it("shows the honest 'no opportunity cleared the bar' message", () => {
+  it("shows an honest, non-fabricating message", () => {
+    // Distinct from the evaluated-not-promoted state: no per-candidate detail
+    // to render, so we tell the founder plainly that nothing scorable was found.
     expect(screen.getByTestId("no-opportunity-state")).toHaveTextContent(
-      "no opportunity cleared the bar"
+      "didn't support composing a candidate to score"
     );
   });
 
@@ -218,8 +256,77 @@ describe("RunResultView — no opportunity promoted", () => {
     );
   });
 
-  it("does not render headline, scores, or sections", () => {
+  it("does NOT render fabricated per-candidate detail", () => {
+    // Regression guard: the "no candidates" branch must NOT accidentally show
+    // score chips or rationale panels (there's no data behind them).
     expect(screen.queryByTestId("opportunity-headline")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("score-row")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("candidates-list")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("candidate-card-0")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("evaluated-not-promoted-state")).not.toBeInTheDocument();
+  });
+});
+
+// ── RunResultView — evaluated but not promoted (aae43d53 fixture) ──────────
+
+describe("RunResultView — evaluated but not promoted", () => {
+  beforeEach(() => {
+    render(<RunResultView result={COMPLETED_EVAL_NOT_PROMOTED} runId="run-result-1" />);
+  });
+
+  it("renders the evaluated-not-promoted state container, NOT the plain no-opportunity fallback", () => {
+    expect(screen.getByTestId("evaluated-not-promoted-state")).toBeInTheDocument();
+    expect(screen.queryByTestId("no-opportunity-state")).not.toBeInTheDocument();
+  });
+
+  it("shows 'No opportunity cleared the bar' headline", () => {
+    expect(screen.getByTestId("not-promoted-headline")).toHaveTextContent(
+      "No opportunity cleared the bar"
+    );
+  });
+
+  it("acknowledges the number of candidates evaluated", () => {
+    expect(screen.getByTestId("evaluated-not-promoted-state")).toHaveTextContent(
+      "We evaluated one candidate"
+    );
+  });
+
+  it("renders the candidate's Quality score at its real value (46%)", () => {
+    expect(screen.getByTestId("candidate-0-score-quality")).toHaveTextContent("46%");
+  });
+
+  it("renders the candidate's Confidence score at 100%", () => {
+    expect(screen.getByTestId("candidate-0-score-confidence")).toHaveTextContent("100%");
+  });
+
+  it("renders founder-fit at 20%, NOT 2000% (regression: earlier 40 rendered as 4000% on promoted view)", () => {
+    expect(screen.getByTestId("candidate-0-score-founder-fit")).toHaveTextContent("20%");
+    expect(screen.getByTestId("candidate-0-score-founder-fit")).not.toHaveTextContent("2000%");
+  });
+
+  it("translates deprecationReason='failed_gate' into a human sentence", () => {
+    expect(screen.getByTestId("candidate-0-gate-reason")).toHaveTextContent(
+      "Founder-fit fell below the minimum threshold"
+    );
+  });
+
+  it("shows the full founder-fit rationale text prominently", () => {
+    const panel = screen.getByTestId("candidate-0-founder-fit-rationale");
+    expect(panel).toBeInTheDocument();
+    expect(panel).toHaveTextContent(
+      "Founder's background is in adjacent SaaS but lacks direct experience"
+    );
+  });
+
+  it("keeps the back-to-status link", () => {
+    expect(screen.getByTestId("back-to-status-link")).toBeInTheDocument();
+    expect(screen.getByTestId("back-to-status-link")).toHaveAttribute(
+      "href",
+      "/runs/run-result-1"
+    );
+  });
+
+  it("does NOT render the promoted-opportunity chrome (score-row, rationale-section, risk-section)", () => {
     expect(screen.queryByTestId("score-row")).not.toBeInTheDocument();
     expect(screen.queryByTestId("rationale-section")).not.toBeInTheDocument();
     expect(screen.queryByTestId("risk-section")).not.toBeInTheDocument();
