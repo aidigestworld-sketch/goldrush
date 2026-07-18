@@ -157,10 +157,36 @@ export class NimLLMClient implements LLMClient {
     // naturally throttles at the concurrency door — the rate-slot timestamp
     // is only recorded when we're actually about to fire, not for calls
     // still parked behind the semaphore. Prevents phantom rate-slot usage.
+    //
+    // Instrumentation: log guard state before/after each call so we can
+    // empirically confirm whether inFlight leaks or the rate-limit window
+    // queues us. Post-mortem answer for the 2026-07-18 hit-rate study's
+    // 302,300 ms discovery timeouts — see runDiscoveryReproTest.ts.
+    const t0 = Date.now();
+    const preInFlight = NimLLMClient.inFlight;
+    const preWindow = NimLLMClient.requestTimestamps.filter(
+      (t) => t > Date.now() - NimLLMClient.WINDOW_MS
+    ).length;
+    console.log(
+      `[NIM] start  inFlight=${preInFlight}  window=${preWindow}/${NimLLMClient.MAX_REQUESTS_PER_MINUTE}  model=${this.model}`
+    );
     await NimLLMClient.acquireConcurrencyPermit();
+    const acqConc = Date.now();
     try {
       await NimLLMClient.acquireRateSlot();
-      return await this.doFetch(systemPrompt, userPrompt);
+      const acqRate = Date.now();
+      try {
+        const out = await this.doFetch(systemPrompt, userPrompt);
+        console.log(
+          `[NIM] ok    totalMs=${Date.now() - t0}  concQ=${acqConc - t0}  rateQ=${acqRate - acqConc}  fetchMs=${Date.now() - acqRate}`
+        );
+        return out;
+      } catch (e) {
+        console.log(
+          `[NIM] FAIL  totalMs=${Date.now() - t0}  concQ=${acqConc - t0}  rateQ=${acqRate - acqConc}  fetchMs=${Date.now() - acqRate}  err=${(e as Error).message.slice(0, 100)}`
+        );
+        throw e;
+      }
     } finally {
       NimLLMClient.releaseConcurrencyPermit();
     }

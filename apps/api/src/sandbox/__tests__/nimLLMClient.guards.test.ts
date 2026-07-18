@@ -123,6 +123,45 @@ describe("NimLLMClient concurrency semaphore (Guard A)", () => {
     expect(results.filter((r) => r.status === "rejected").length).toBe(2);
     expect(results.filter((r) => r.status === "fulfilled").length).toBe(2);
   });
+
+  it("in-flight counter decrements when fetch RETURNS 504 (non-ok response, not thrown)", async () => {
+    // Different failure mode from the "fetch throws" test above: the
+    // production 504 path in doFetch() is `if (!response.ok) throw new
+    // Error(...)` — the throw happens INSIDE our own code, AFTER fetch
+    // resolves with a non-ok Response. Previous tests only exercised
+    // `throw new Error()` from the fetch stub itself. The 2026-07-18
+    // hit-rate study surfaced 4 discovery 504s and this test proves
+    // that failure mode doesn't leak permits either.
+    process.env.NIM_MAX_CONCURRENT_CALLS = "2";
+    let callCount = 0;
+    vi.stubGlobal("fetch", async () => {
+      callCount++;
+      if (callCount <= 2) {
+        return {
+          ok: false,
+          status: 504,
+          text: async () => "gateway timeout",
+        } as unknown as Response;
+      }
+      return {
+        ok: true,
+        json: async () => ({ choices: [{ message: { content: "ok" }, finish_reason: "stop" }] }),
+      } as unknown as Response;
+    });
+
+    const client = newClient();
+    // If a 504 return leaked a permit, calls 3-4 would deadlock forever
+    // waiting for the phantom in-flight entries to drop. Await with a
+    // ceiling — if we hang, the test times out rather than hangs the suite.
+    const results = await Promise.allSettled(
+      Array.from({ length: 4 }, () => client.complete("sys", "user"))
+    );
+    expect(results.filter((r) => r.status === "rejected").length).toBe(2);
+    expect(results.filter((r) => r.status === "fulfilled").length).toBe(2);
+    for (const r of results.filter((x) => x.status === "rejected") as PromiseRejectedResult[]) {
+      expect(String(r.reason)).toMatch(/504/);
+    }
+  });
 });
 
 describe("NimLLMClient rolling-window rate limiter (Guard B)", () => {
