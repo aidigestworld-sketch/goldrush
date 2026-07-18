@@ -45,6 +45,7 @@ export default defineConfig({
       "src/sandbox/__tests__/opportunityRationaleSandbox.test.ts",
       "src/sandbox/__tests__/validationSandbox.test.ts",
       "src/sandbox/__tests__/nimLLMClient.config.test.ts",
+      "src/sandbox/__tests__/nimLLMClient.guards.test.ts",
       "src/sandbox/__tests__/parseLlmJson.test.ts",
       "src/sandbox/__tests__/tokenBudget.test.ts",
       "src/orchestrator/__tests__/resolveHypothesisId.test.ts",
