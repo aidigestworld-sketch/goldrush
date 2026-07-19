@@ -29,6 +29,7 @@ import { prisma } from "../db/client";
 import { makeNimLlmForAgent } from "./llmFactory";
 import * as checkpoint from "./checkpoint.repository";
 import { loadRunContext } from "./runContext";
+import { tryResolveProblemIdForRun, tryResolveCandidateIdForRun } from "./idResolvers";
 import type { DagStep } from "./steps";
 
 export interface JobData {
@@ -57,10 +58,32 @@ async function withIdempotency(
   run: () => Promise<HandlerResult>
 ): Promise<HandlerResult> {
   const existing = await checkpoint.getRow(data.runId, step);
-  if (existing?.status === "succeeded") {
+  if (!existing) {
+    // No dag_run_state row for this (runId, step). Either the row was
+    // never created (phantom BullMQ job leftover in Redis from a prior
+    // test/debug session whose DB rows were cleaned up), or it was
+    // deleted between enqueue and worker pickup (operator/script reset).
+    // Skip silently — no agent run, no NIM call, no DB writes. The job
+    // ends "completed" from BullMQ's perspective, no retry storm.
+    // The 2026-07-18 study surfaced this: phantom jobs burned 15 min
+    // of NIM wall time each on P2025 markRunning failures × 3 retries.
+    return {
+      skipped: true,
+      skipReason: `no dag_run_state row for run=${data.runId} step=${step} — presumed cancelled or phantom`,
+    };
+  }
+  if (existing.status === "succeeded") {
     return { skipped: true, skipReason: `step ${step} already succeeded on run ${data.runId}` };
   }
-  await checkpoint.markRunning(data.runId, step);
+  const running = await checkpoint.markRunning(data.runId, step);
+  if (!running) {
+    // Defense-in-depth: row disappeared between getRow and markRunning.
+    // Same skip semantics as the null-existing branch.
+    return {
+      skipped: true,
+      skipReason: `dag_run_state row for run=${data.runId} step=${step} deleted mid-flight — presumed cancelled`,
+    };
+  }
   const result = await run();
   await checkpoint.markSucceeded(data.runId, step, result.candidateId ?? null);
   return result;
@@ -71,6 +94,29 @@ export const handlers: Record<DagStep, (data: JobData) => Promise<HandlerResult>
     withIdempotency("discovery", data, async () => {
       const llm = await makeNimLlmForAgent("Discovery");
       const result = await runDiscoveryAgent(data.runId, llm);
+      // Same shape as expansion below: treat "ran cleanly but produced
+      // zero output" as transient and retry. The ba923046 incident on
+      // 2026-07-15 hit this: Discovery's attempt 2 succeeded with
+      // marketsCreated=0 despite 179 search_signal + 3 competitor_material +
+      // more evidence rows in shopify_subscriptions — a transient mid-tier-
+      // model output-quality miss that a fresh call typically recovers from.
+      //
+      // CRITICAL: only retry when the run WASN'T skipped. A skipped result
+      // (result.skipped === true) means Discovery hit a genuine precondition
+      // guard — evidenceRows.length === 0 for its vertical, OR bounded-rule
+      // violations already logged separately. Retrying either wouldn't help
+      // (evidence doesn't appear on retry; the same prompt+corpus produces
+      // similar violations). The retry is scoped strictly to "no skip
+      // reason, zero output" — i.e. the LLM returned an empty parsed.markets
+      // despite everything being available.
+      const brvCount = (result as { boundedRuleViolations?: string[] }).boundedRuleViolations?.length ?? 0;
+      if (brvCount > 0 || (!result.skipped && result.marketsCreated === 0)) {
+        throw new Error(
+          brvCount > 0
+            ? `discovery had ${brvCount} bounded-rule violation(s) — retrying`
+            : "discovery ran cleanly but produced 0 markets — retrying (likely transient mid-tier-model empty-output)"
+        );
+      }
       return { extra: { ...result } };
     }),
 
@@ -124,8 +170,9 @@ export const handlers: Record<DagStep, (data: JobData) => Promise<HandlerResult>
     withIdempotency("competitive_analysis", data, async () => {
       const ctx = await loadRunContext(data.runId, data.hypothesisId);
       // Use || not ?? so that ctx.problemId="" (no hypothesis sources yet) falls
-      // through to resolveProblemIdForRun — ?? stops on empty string.
-      const problemId = data.problemId || ctx.problemId || (await resolveProblemIdForRun(data.runId));
+      // through to tryResolveProblemIdForRun — ?? stops on empty string.
+      const problemId =
+        data.problemId || ctx.problemId || (await tryResolveProblemIdForRun(data.runId, undefined));
       if (!problemId) return { skipped: true, skipReason: "no problemId available" };
 
       // Same shape as the runCompetitiveAnalysisLive script: derive the
@@ -145,7 +192,8 @@ export const handlers: Record<DagStep, (data: JobData) => Promise<HandlerResult>
   hypothesis: (data) =>
     withIdempotency("hypothesis", data, async () => {
       const ctx = await loadRunContext(data.runId, data.hypothesisId);
-      const problemId = data.problemId || ctx.problemId || (await resolveProblemIdForRun(data.runId));
+      const problemId =
+        data.problemId || ctx.problemId || (await tryResolveProblemIdForRun(data.runId, undefined));
       if (!problemId) return { skipped: true, skipReason: "no problemId available" };
       const llm = await makeNimLlmForAgent("Hypothesis");
       const result = await runHypothesisAgent(data.runId, problemId, llm);
@@ -155,12 +203,11 @@ export const handlers: Record<DagStep, (data: JobData) => Promise<HandlerResult>
   validation: (data) =>
     withIdempotency("validation", data, async () => {
       const llm = await makeNimLlmForAgent("Validation");
-      const hypothesisId = await resolveHypothesisIdForRun(data.runId, data.hypothesisId);
-      // Wire a live searchProvider (Tavily) so Validation exercises its
-      // full evidence-fetch path. If TAVILY_API_KEY is missing, run
-      // without it — Validation degrades to corpus-only classification.
+      // Agent self-resolves data.hypothesisId (may be undefined for
+      // Stripe-originated runs). Defense-in-depth against callers
+      // that forward a raw JobData.hypothesisId to findUnique.
       const hasTavily = !!process.env.TAVILY_API_KEY;
-      const result = await runValidationAgent(data.runId, hypothesisId, llm, {
+      const result = await runValidationAgent(data.runId, data.hypothesisId, llm, {
         searchProvider: hasTavily
           ? async (ctx) => {
               const out = await searchForHypothesisEvidence({
@@ -178,15 +225,13 @@ export const handlers: Record<DagStep, (data: JobData) => Promise<HandlerResult>
   confidence_mode1: (data) =>
     withIdempotency("confidence_mode1", data, async () => {
       const llm = await makeNimLlmForAgent("Confidence");
-      const hypothesisId = await resolveHypothesisIdForRun(data.runId, data.hypothesisId);
-      const result = await runConfidenceAgent(data.runId, hypothesisId, llm);
+      const result = await runConfidenceAgent(data.runId, data.hypothesisId, llm);
       return { extra: { ...result } };
     }),
 
   composition: (data) =>
     withIdempotency("composition", data, async () => {
-      const hypothesisId = await resolveHypothesisIdForRun(data.runId, data.hypothesisId);
-      const result = await runCompositionAgent(data.runId, hypothesisId);
+      const result = await runCompositionAgent(data.runId, data.hypothesisId);
       // Composition may have produced a new candidate; propagate its id
       // to the checkpoint row so downstream handlers can pick it up.
       return { candidateId: result.candidateId ?? undefined, extra: { ...result } };
@@ -195,28 +240,22 @@ export const handlers: Record<DagStep, (data: JobData) => Promise<HandlerResult>
   scoring: (data) =>
     withIdempotency("scoring", data, async () => {
       const ctx = await loadRunContext(data.runId, data.hypothesisId);
-      const candidateId = data.candidateId ?? (await resolveCandidateIdForRun(data.runId));
-      if (!candidateId) return { skipped: true, skipReason: "no candidate found for run" };
-      const result = await runScoringAgent(data.runId, candidateId, ctx.vertical);
-      return { candidateId, extra: { ...result } };
+      const result = await runScoringAgent(data.runId, data.candidateId, ctx.vertical);
+      return { candidateId: result.candidateId ?? undefined, extra: { ...result } };
     }),
 
   confidence_mode2: (data) =>
     withIdempotency("confidence_mode2", data, async () => {
-      const candidateId = data.candidateId ?? (await resolveCandidateIdForRun(data.runId));
-      if (!candidateId) return { skipped: true, skipReason: "no candidate found for run" };
-      const result = await runConfidenceMode2Agent(data.runId, candidateId);
-      return { candidateId, extra: { ...result } };
+      const result = await runConfidenceMode2Agent(data.runId, data.candidateId);
+      return { candidateId: result.candidateId ?? undefined, extra: { ...result } };
     }),
 
   founder_fit: (data) =>
     withIdempotency("founder_fit", data, async () => {
       const ctx = await loadRunContext(data.runId, data.hypothesisId);
-      const candidateId = data.candidateId ?? (await resolveCandidateIdForRun(data.runId));
-      if (!candidateId) return { skipped: true, skipReason: "no candidate found for run" };
       const llm = await makeNimLlmForAgent("FounderFit");
-      const result = await runFounderFitAgent(data.runId, candidateId, ctx.founderId, llm);
-      return { candidateId, extra: { ...result } };
+      const result = await runFounderFitAgent(data.runId, data.candidateId, ctx.founderId, llm);
+      return { candidateId: result.candidateId ?? undefined, extra: { ...result } };
     }),
 
   compression: (data) =>
@@ -240,16 +279,6 @@ export const handlers: Record<DagStep, (data: JobData) => Promise<HandlerResult>
 };
 
 // Helpers ---------------------------------------------------------------
-
-async function resolveCandidateIdForRun(runId: string): Promise<string | null> {
-  // Composition writes exactly one candidate per run (single-hypothesis
-  // MVP). Pick the most recent 'candidate' row for this run.
-  const row = await prisma.opportunityCandidate.findFirst({
-    where: { runId, status: "candidate" },
-    orderBy: { createdAt: "desc" },
-  });
-  return row?.id ?? null;
-}
 
 async function deriveCompetitorMapFromEvidence(vertical: string): Promise<Map<string, string[]>> {
   // Same convention as runCompetitiveAnalysisLive.ts's URL-pattern map.
@@ -282,37 +311,6 @@ function competitorNameFromUrl(url: string): string | null {
   return null;
 }
 
-// For fresh runs: hypothesis agent creates a DB row with a new auto-UUID that
-// differs from the orchestrator's tracking key (data.hypothesisId). This
-// helper tries the tracking key first (works on re-runs) and falls back to
-// the most recent active hypothesis written by this run.
-//
-// trackingKey is string | undefined because JobData.hypothesisId is optional:
-// Stripe-originated runs never have a pre-existing hypothesisId. For those
-// runs, skip findUnique entirely (Prisma throws on { where: { id: undefined } })
-// and use the fallback path directly.
-export async function resolveHypothesisIdForRun(runId: string, trackingKey: string | undefined): Promise<string> {
-  if (trackingKey) {
-    const direct = await prisma.hypothesis.findUnique({ where: { id: trackingKey } });
-    if (direct) return direct.id;
-  }
-  const fallback = await prisma.hypothesis.findFirst({
-    where: { status: "active", pipelineRunId: runId },
-    orderBy: { createdAt: "desc" },
-  });
-  if (!fallback) {
-    throw new Error(`resolveHypothesisIdForRun: no active hypothesis found for runId=${runId}`);
-  }
-  return fallback.id;
-}
-
-// For fresh runs: problem agent creates a DB row before hypothesis_sources
-// exists. This helper returns the preferred problemId if non-empty, otherwise
-// falls back to the earliest active problem written for this run.
-async function resolveProblemIdForRun(runId: string): Promise<string | undefined> {
-  const fallback = await prisma.problem.findFirst({
-    where: { status: "active", pipelineRunId: runId },
-    orderBy: { createdAt: "asc" },
-  });
-  return fallback?.id;
-}
+// Resolvers moved to ./idResolvers.ts so agents can call them directly
+// and prevent the "findUnique with id: undefined" bug class at the
+// agent entry point rather than depending on the handler pre-resolving.

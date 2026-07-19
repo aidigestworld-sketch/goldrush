@@ -20,6 +20,7 @@ import { prisma } from "../db/client";
 import { startWorkers, stopWorkers } from "../orchestrator/worker";
 import { enqueueStep } from "../orchestrator/sequencing";
 import { DAG_STEPS, JOIN_STEP, type DagStep } from "../orchestrator/steps";
+import { getQueue } from "../orchestrator/queues";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
@@ -112,22 +113,42 @@ function sleep(ms: number) {
 }
 
 async function resetPriorRunsForKey(trackingKey: string): Promise<void> {
+  // The only reset the orchestrator strictly requires is dropping
+  // dag_run_state for this tracking key — otherwise the next
+  // orchestrate call resumes from prior checkpoints instead of firing
+  // discovery fresh. dag_run_state has no FK children, so this is
+  // always safe.
+  //
+  // The pipeline artifacts (opportunity_candidate, hypothesis, etc.)
+  // from the prior run become orphans in the DB but don't interfere
+  // with THIS run — each new pipeline_run gets a fresh runId, and
+  // collectResult queries by that new id. Best-effort cleanup below,
+  // but individual FK failures are logged and swallowed so the study
+  // continues rather than chase every child table's FK chain.
   const priorRows = await prisma.dagRunState.findMany({ where: { hypothesisId: trackingKey } });
   const priorRunIds = [...new Set(priorRows.map((r) => r.runId))];
-  if (priorRunIds.length === 0) return;
-  console.log(`  [reset] wiping ${priorRunIds.length} prior run(s) for trackingKey=${trackingKey}`);
-  for (const runId of priorRunIds) {
-    const cand = await prisma.opportunityCandidate.findFirst({ where: { runId } });
-    if (cand) {
-      await prisma.opportunity.deleteMany({ where: { promotedFromCandidateId: cand.id } });
-    }
-    await prisma.opportunityCandidate.deleteMany({ where: { runId } });
-    await prisma.hypothesis.deleteMany({ where: { pipelineRunId: runId } });
-    await prisma.problem.deleteMany({ where: { pipelineRunId: runId } });
-    await prisma.audience.deleteMany({ where: { pipelineRunId: runId } });
-    await prisma.market.deleteMany({ where: { pipelineRunId: runId } });
-  }
   await prisma.dagRunState.deleteMany({ where: { hypothesisId: trackingKey } });
+  if (priorRunIds.length === 0) return;
+  console.log(`  [reset] cleared dag_run_state for trackingKey=${trackingKey}; best-effort wiping ${priorRunIds.length} prior run(s)`);
+  for (const runId of priorRunIds) {
+    try {
+      const cands = await prisma.opportunityCandidate.findMany({ where: { runId }, select: { id: true } });
+      for (const c of cands) {
+        await prisma.opportunity.deleteMany({ where: { promotedFromCandidateId: c.id } }).catch(() => {});
+        await prisma.opportunityCandidateComposition.deleteMany({ where: { candidateId: c.id } }).catch(() => {});
+      }
+      await prisma.agentExecutionLog
+        .updateMany({ where: { runId, candidateId: { not: null } }, data: { candidateId: null } })
+        .catch(() => {});
+      await prisma.opportunityCandidate.deleteMany({ where: { runId } }).catch(() => {});
+      await prisma.hypothesis.deleteMany({ where: { pipelineRunId: runId } }).catch(() => {});
+      await prisma.problem.deleteMany({ where: { pipelineRunId: runId } }).catch(() => {});
+      await prisma.audience.deleteMany({ where: { pipelineRunId: runId } }).catch(() => {});
+      await prisma.market.deleteMany({ where: { pipelineRunId: runId } }).catch(() => {});
+    } catch (e) {
+      console.warn(`  [reset] partial cleanup of runId=${runId} failed (orphans harmless): ${(e as Error).message.slice(0, 100)}`);
+    }
+  }
 }
 
 // Derive overall run status directly from dag_run_state rows for one run.
@@ -210,16 +231,21 @@ async function collectResult(
 
   const cand = candidates[0];
   if (cand) {
+    // ventureScore lives on the promoted Opportunity row, NOT on the
+    // OpportunityCandidate — compressionAgent.ts:296 writes it there
+    // when the promotion transaction commits. Prior driver read from
+    // the candidate row (always null in DB) and mis-reported. Look up
+    // opportunity here and pull ventureScore from it if present.
+    const opp = await prisma.opportunity.findUnique({ where: { promotedFromCandidateId: cand.id } });
     base.candidate = {
       id: cand.id,
       opportunityQuality: cand.opportunityQuality,
       founderFitScore: cand.founderFitScore,
-      ventureScore: cand.ventureScore,
+      ventureScore: opp?.ventureScore ?? null,
       confidenceScore: cand.confidenceScore,
       coverageGate: (cand as any).confidenceCoverageGate ?? null,
       incompleteComposition: (cand as any).incompleteComposition ?? null,
     };
-    const opp = await prisma.opportunity.findUnique({ where: { promotedFromCandidateId: cand.id } });
     if (opp) {
       base.promoted = true;
       base.opportunityId = opp.id;
@@ -227,15 +253,22 @@ async function collectResult(
   }
 
   try {
+    // Correct schema — no latencyMs/statusCode fields. Compute latency
+    // from startedAt/completedAt; scan status + rawOutput for 504.
     const logs = await prisma.agentExecutionLog.findMany({
       where: { runId },
-      select: { rawOutput: true, agentName: true, latencyMs: true, statusCode: true },
+      select: { agentName: true, startedAt: true, completedAt: true, status: true, rawOutput: true, attemptNumber: true },
+      orderBy: { startedAt: "asc" },
     });
     base.nimCallCount = logs.length;
-    base.nimTimingMsTotal = logs.reduce((acc, l) => acc + (l.latencyMs ?? 0), 0);
+    base.nimTimingMsTotal = logs.reduce((acc, l) => {
+      const start = l.startedAt ? new Date(l.startedAt).getTime() : 0;
+      const end = l.completedAt ? new Date(l.completedAt).getTime() : 0;
+      return acc + (start && end && end > start ? end - start : 0);
+    }, 0);
     base.nim504Count = logs.filter((l) => {
       const raw = typeof l.rawOutput === "string" ? l.rawOutput : JSON.stringify(l.rawOutput ?? "");
-      return l.statusCode === 504 || raw.includes("504") || raw.toLowerCase().includes("gateway timeout");
+      return raw.includes("504") || raw.toLowerCase().includes("gateway timeout") || (l.status === "failed" && (raw.includes("NIM") || raw.includes("nemotron")));
     }).length;
   } catch (e) {
     console.warn(`  [${profile.key}] agent_execution_log scan skipped: ${(e as Error).message}`);
@@ -423,6 +456,21 @@ async function main() {
     if (!founder) throw new Error(`Profile ${profile.key}: founderId ${profile.founderId} not found`);
   }
   console.log(`[setup] all 6 founder rows resolved`);
+
+  // Obliterate any leftover BullMQ jobs from prior sessions BEFORE
+  // starting workers. Prior study runs that errored mid-flight leave
+  // orphaned jobs in Redis whose dag_run_state rows have been deleted
+  // by the reset. If left, they compete with study jobs on the
+  // concurrency=1 discovery worker (observed: P1 stuck 11+ min while
+  // an orphaned P2025-failing job burned through its retry budget).
+  for (const step of DAG_STEPS) {
+    try {
+      await getQueue(step).obliterate({ force: true });
+    } catch (e) {
+      console.warn(`  [drain] queue=${step} obliterate failed (non-fatal): ${(e as Error).message.slice(0, 80)}`);
+    }
+  }
+  console.log(`[setup] drained all ${DAG_STEPS.length} queues`);
 
   startWorkers();
   console.log(`[setup] workers started (${DAG_STEPS.length} queues)`);

@@ -75,10 +75,19 @@ export async function listForRun(runId: string): Promise<CheckpointRow[]> {
 
 // markRunning: called by handler at job start. Increments attempt_count
 // atomically so BullMQ retries produce a visible trail. Returns the
-// updated row so the caller can log.
-export async function markRunning(runId: string, step: DagStep): Promise<CheckpointRow> {
-  const row = await prisma.dagRunState.update({
-    where: { runId_step: { runId, step } },
+// updated row, or null if no row exists (stale phantom BullMQ job whose
+// dag_run_state row was cleaned up — same defensive `updateMany` pattern
+// used by recordAttemptError and markFailedPermanent).
+//
+// Rationale (surfaced by the 2026-07-18 hit-rate study): stale jobs left
+// in Redis from prior test/debug sessions were resurrected by workers
+// and crashed on P2025 here, burning 3 retries × ~5min = 15 min of NIM
+// wall time per phantom. Returning null lets the caller (withIdempotency
+// in handlers.ts) treat the missing row as a "cancelled run" and skip
+// cleanly instead of throwing.
+export async function markRunning(runId: string, step: DagStep): Promise<CheckpointRow | null> {
+  const result = await prisma.dagRunState.updateMany({
+    where: { runId, step },
     data: {
       status: "running",
       attemptCount: { increment: 1 },
@@ -86,7 +95,11 @@ export async function markRunning(runId: string, step: DagStep): Promise<Checkpo
       updatedAt: new Date(),
     },
   });
-  return toDomain(row);
+  if (result.count === 0) return null;
+  const row = await prisma.dagRunState.findUnique({
+    where: { runId_step: { runId, step } },
+  });
+  return row ? toDomain(row) : null;
 }
 
 export async function markSucceeded(
