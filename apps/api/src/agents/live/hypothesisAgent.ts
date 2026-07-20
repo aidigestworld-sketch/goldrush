@@ -12,6 +12,8 @@ import { nodeSourceRefRepository } from "../../repositories/nodeSourceRef.reposi
 import { agentExecutionLogService } from "../../services/agentExecutionLog.service";
 import { computeSupportingEvidenceStrength } from "../evidenceStrength";
 import { prisma } from "../../db/client";
+import { tryResolveProblemIdForRun } from "../../orchestrator/idResolvers";
+import { selectWithinTokenBudget, getInputTokenBudgetForModel } from "../../sandbox/tokenBudget";
 
 export interface HypothesisRunResult {
   hypothesesCreated: number;
@@ -20,10 +22,22 @@ export interface HypothesisRunResult {
   skipReason?: string;
 }
 
-export async function runHypothesisAgent(runId: string, problemId: string, llm: LLMClient): Promise<HypothesisRunResult> {
-  const problem = await prisma.problem.findUnique({ where: { id: problemId } });
+// problemId is `string | undefined` (not required): Stripe-originated
+// runs never have a pre-existing trackingKey. The agent resolves via
+// tryResolveProblemIdForRun at its entry point so `id: undefined` can
+// never reach the prisma.problem.findUnique call below.
+export async function runHypothesisAgent(
+  runId: string,
+  problemId: string | undefined,
+  llm: LLMClient
+): Promise<HypothesisRunResult> {
+  const resolvedProblemId = await tryResolveProblemIdForRun(runId, problemId);
+  if (!resolvedProblemId) {
+    return { hypothesesCreated: 0, boundedRuleViolations: [], skipped: true, skipReason: "no problemId available" };
+  }
+  const problem = await prisma.problem.findUnique({ where: { id: resolvedProblemId } });
   if (!problem || problem.status !== "active") {
-    return { hypothesesCreated: 0, boundedRuleViolations: [], skipped: true, skipReason: `problem ${problemId} not found or not active` };
+    return { hypothesesCreated: 0, boundedRuleViolations: [], skipped: true, skipReason: `problem ${resolvedProblemId} not found or not active` };
   }
 
   // Find ExistingSolutions connected to this Problem via addressed_by
@@ -54,6 +68,32 @@ export async function runHypothesisAgent(runId: string, problemId: string, llm: 
   const evidenceIds = [...new Set([...problemRefs, ...solutionRefs].map((r) => r.evidenceId))];
   const evidenceRows = await prisma.evidence.findMany({ where: { id: { in: evidenceIds } } });
 
+  // Token-budget selection over cited evidence — same pattern as
+  // Discovery / Expansion / CompetitiveAnalysis / Validation. As
+  // CompetitiveAnalysis writes more ExistingSolutions per Problem,
+  // each with its own node_source_refs, the cited-evidence pool
+  // feeding Hypothesis grows unbounded. Wire the budget here to
+  // preempt the same input-token-overflow class Validation hit on
+  // 2026-07-16.
+  const budgetResult = selectWithinTokenBudget(
+    evidenceRows.map((e) => ({
+      id: e.id,
+      sourceType: e.sourceType,
+      text: e.extractedFact,
+      recencyAt: e.sourcePublishedAt ?? e.fetchedAt ?? null,
+    })),
+    getInputTokenBudgetForModel((llm as { model?: string }).model)
+  );
+  if (budgetResult.droppedCount > 0) {
+    console.warn(
+      `[Hypothesis] token-budget: kept ${budgetResult.selected.length}/${evidenceRows.length} evidence rows ` +
+        `(~${budgetResult.totalTokensEstimated} tokens, budget=${budgetResult.budgetTokens}), ` +
+        `dropped by source_type: ${JSON.stringify(budgetResult.droppedBySourceType)}`
+    );
+  }
+  const selectedIds = new Set(budgetResult.selected.map((s) => s.id));
+  const budgetedEvidenceRows = evidenceRows.filter((e) => selectedIds.has(e.id));
+
   const sandboxInput: HypothesisSandboxInput = {
     problem: {
       id: problem.id,
@@ -67,13 +107,14 @@ export async function runHypothesisAgent(runId: string, problemId: string, llm: 
       positioningSummary: s.positioningSummary,
       pricingSummary: (s.pricingModel as { summary?: string } | null)?.summary ?? null,
     })),
-    evidence: evidenceRows.map((e) => ({ id: e.id, sourceUrlOrIdentifier: e.sourceUrlOrIdentifier, text: e.extractedFact })),
+    evidence: budgetedEvidenceRows.map((e) => ({ id: e.id, sourceUrlOrIdentifier: e.sourceUrlOrIdentifier, text: e.extractedFact })),
   };
 
   return agentExecutionLogService.run(
     { runId, agentName: "Hypothesis", modelUsed: (llm as { model?: string }).model ?? null },
-    async () => {
+    async (ctx) => {
       const result = await runHypothesisSandbox(llm, sandboxInput);
+      ctx.setRawOutput(result.rawResponse);
 
       if (!result.parsed) {
         throw new Error(`Hypothesis Agent output failed schema validation: ${result.validationErrors.join("; ")}`);

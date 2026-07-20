@@ -21,13 +21,21 @@ export class AgentExecutionLogService {
 
   async succeed(
     logId: string,
-    result: { outputHash?: string | null; costEstimate?: number | null; graphMutationCount?: number | null } = {}
+    result: {
+      outputHash?: string | null;
+      costEstimate?: number | null;
+      graphMutationCount?: number | null;
+      rawOutput?: string | null;
+    } = {}
   ) {
     return agentExecutionLogRepository.complete(logId, { status: "success", ...result });
   }
 
-  async fail(logId: string) {
-    return agentExecutionLogRepository.complete(logId, { status: "failed" });
+  async fail(logId: string, result: { rawOutput?: string | null } = {}) {
+    // Persist raw output even on failure — this is where triage most
+    // needs it (e.g. Discovery threw because parsed.markets was empty
+    // and the retry-on-empty logic decided to fail loudly).
+    return agentExecutionLogRepository.complete(logId, { status: "failed", ...result });
   }
 
   async retry(logId: string) {
@@ -56,9 +64,15 @@ export class AgentExecutionLogService {
   // Fixed with an optional metrics extractor — callers that care about
   // reporting mutation counts pass one; callers that don't can omit it
   // and keep the old (NULL) behavior rather than being forced to change.
+  // fn receives a `RunContext` it can use to attach observability data
+  // (currently: raw LLM output) that isn't part of the returned business
+  // value. This keeps agent return types clean while still capturing the
+  // raw response for post-hoc triage (added in response to the ba923046
+  // Discovery-returned-zero-markets incident where we had no way to
+  // inspect the actual LLM output).
   async run<T>(
     input: RunAgentStageInput,
-    fn: () => Promise<T>,
+    fn: (ctx: RunContext) => Promise<T>,
     extractMetrics?: (result: T) => {
       outputHash?: string | null;
       costEstimate?: number | null;
@@ -66,16 +80,36 @@ export class AgentExecutionLogService {
     }
   ): Promise<T> {
     const log = await this.start(input);
+    const ctx = newRunContext();
     try {
-      const result = await fn();
+      const result = await fn(ctx);
       const metrics = extractMetrics ? extractMetrics(result) : {};
-      await this.succeed(log.id, metrics);
+      await this.succeed(log.id, { ...metrics, rawOutput: ctx.rawOutput });
       return result;
     } catch (err) {
-      await this.fail(log.id);
+      await this.fail(log.id, { rawOutput: ctx.rawOutput });
       throw err;
     }
   }
+}
+
+// Mutable box the agent's fn writes to. Not exported directly — created
+// per-invocation inside `run()` and passed in as the fn's argument.
+export interface RunContext {
+  setRawOutput: (raw: string | null | undefined) => void;
+  readonly rawOutput: string | null;
+}
+
+function newRunContext(): RunContext & { rawOutput: string | null } {
+  const box: { rawOutput: string | null } = { rawOutput: null };
+  return {
+    setRawOutput(raw) {
+      box.rawOutput = raw ?? null;
+    },
+    get rawOutput() {
+      return box.rawOutput;
+    },
+  };
 }
 
 export const agentExecutionLogService = new AgentExecutionLogService();

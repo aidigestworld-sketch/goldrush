@@ -1,1 +1,461 @@
 @import "tailwindcss";
+
+/* ─────────────────────────────────────────────────────────────
+ * GoldRush landing page — scoped dark theme + animations.
+ * Applied only under .gr-root so the authenticated dashboard
+ * (light theme) is unaffected.
+ * ───────────────────────────────────────────────────────────── */
+
+.gr-root {
+  --gr-bg: #0a0d12;
+  --gr-bg-panel: #10141c;
+  --gr-bg-panel-2: #141924;
+  --gr-line: #232a38;
+  --gr-line-soft: #1a2029;
+  --gr-text: #eef1f6;
+  --gr-text-dim: #8a93a6;
+  --gr-text-faint: #4d5566;
+  --gr-amber: #f5a83c;
+  --gr-amber-dim: #a8712a;
+  --gr-teal: #2dd4bf;
+  --gr-teal-dim: #1a5c53;
+  --gr-red: #ef6461;
+
+  background: var(--gr-bg);
+  color: var(--gr-text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+.gr-root .gr-mono {
+  font-family: "SF Mono", Consolas, Menlo, monospace;
+}
+
+.gr-root a:focus-visible,
+.gr-root button:focus-visible {
+  outline: 2px solid var(--gr-teal);
+  outline-offset: 2px;
+}
+
+.gr-bg-grid {
+  position: fixed;
+  inset: 0;
+  background-image: radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  background-size: 28px 28px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.gr-bg-glow {
+  position: fixed;
+  top: -20%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 900px;
+  height: 900px;
+  background: radial-gradient(circle, rgba(245, 168, 60, 0.06) 0%, rgba(45, 212, 191, 0.03) 40%, transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ── Nav ──────────────────────────────────────────────────── */
+.gr-nav {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 22px clamp(20px, 5vw, 64px);
+  border-bottom: 1px solid var(--gr-line-soft);
+}
+.gr-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 600;
+  font-size: 16px;
+  letter-spacing: -0.01em;
+}
+.gr-brand-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--gr-amber);
+  box-shadow: 0 0 12px 2px rgba(245, 168, 60, 0.6);
+}
+.gr-nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+.gr-nav-link {
+  font-family: "SF Mono", Consolas, Menlo, monospace;
+  font-size: 13px;
+  color: var(--gr-text-dim);
+  text-decoration: none;
+  transition: color 0.2s ease;
+  white-space: nowrap;
+}
+.gr-nav-link:hover {
+  color: var(--gr-text);
+}
+.gr-nav-cta {
+  font-family: "SF Mono", Consolas, Menlo, monospace;
+  font-size: 13px;
+  color: var(--gr-text);
+  text-decoration: none;
+  border: 1px solid var(--gr-line);
+  padding: 9px 16px;
+  border-radius: 6px;
+  transition: border-color 0.2s ease, background 0.2s ease;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.gr-nav-cta:hover {
+  border-color: var(--gr-amber-dim);
+  background: rgba(245, 168, 60, 0.06);
+}
+
+/* ── Main / Hero ──────────────────────────────────────────── */
+.gr-main {
+  position: relative;
+  z-index: 5;
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: clamp(56px, 10vw, 120px) clamp(20px, 5vw, 64px) 40px;
+}
+.gr-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: "SF Mono", Consolas, Menlo, monospace;
+  font-size: 12.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--gr-teal);
+  margin-bottom: 28px;
+}
+.gr-eyebrow::before {
+  content: "";
+  width: 22px;
+  height: 1px;
+  background: var(--gr-teal-dim);
+}
+.gr-h1 {
+  font-size: clamp(38px, 6.4vw, 68px);
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: 1.04;
+  max-width: 780px;
+  margin: 0;
+}
+.gr-accent {
+  color: var(--gr-amber);
+}
+.gr-sub {
+  margin-top: 26px;
+  font-size: clamp(16px, 2vw, 19px);
+  color: var(--gr-text-dim);
+  max-width: 560px;
+  line-height: 1.6;
+}
+.gr-cta-row {
+  margin-top: 40px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+.gr-cta-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--gr-amber);
+  color: #17110a;
+  font-weight: 700;
+  font-size: 15.5px;
+  padding: 15px 26px;
+  border-radius: 8px;
+  text-decoration: none;
+  box-shadow: 0 8px 24px -8px rgba(245, 168, 60, 0.45);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  cursor: pointer;
+}
+.gr-cta-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 28px -6px rgba(245, 168, 60, 0.55);
+}
+.gr-cta-primary svg {
+  transition: transform 0.15s ease;
+}
+.gr-cta-primary:hover svg {
+  transform: translateX(3px);
+}
+.gr-cta-note {
+  font-family: "SF Mono", Consolas, Menlo, monospace;
+  font-size: 12.5px;
+  color: var(--gr-text-faint);
+  letter-spacing: 0.01em;
+}
+
+/* ── Waitlist form ────────────────────────────────────────── */
+.gr-waitlist-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(100%, 460px);
+}
+.gr-waitlist-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.gr-waitlist-input {
+  flex: 1 1 220px;
+  min-width: 0;
+  background: var(--gr-bg-panel);
+  border: 1px solid var(--gr-line);
+  color: var(--gr-text);
+  font-size: 15px;
+  padding: 14px 16px;
+  border-radius: 8px;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.gr-waitlist-input::placeholder {
+  color: var(--gr-text-faint);
+}
+.gr-waitlist-input:focus {
+  border-color: var(--gr-amber-dim);
+  box-shadow: 0 0 0 3px rgba(245, 168, 60, 0.15);
+}
+.gr-waitlist-input[aria-invalid="true"] {
+  border-color: var(--gr-red);
+}
+.gr-waitlist-submit {
+  padding: 14px 22px;
+}
+.gr-waitlist-submit:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+/* Off-screen honeypot — invisible to real users, still submittable
+   by a naive bot that fills every input. */
+.gr-waitlist-hp {
+  position: absolute;
+  left: -10000px;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+.gr-waitlist-error {
+  margin: 0;
+  color: var(--gr-red);
+  font-size: 13px;
+}
+.gr-waitlist-success {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(45, 212, 191, 0.08);
+  border: 1px solid var(--gr-teal-dim);
+  color: var(--gr-text);
+  padding: 14px 20px;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 500;
+}
+.gr-waitlist-success-mark {
+  color: var(--gr-teal);
+  font-weight: 700;
+}
+
+/* ── Live-scan panel ──────────────────────────────────────── */
+.gr-panel-wrap {
+  margin-top: 72px;
+}
+.gr-panel {
+  position: relative;
+  background: var(--gr-bg-panel);
+  border: 1px solid var(--gr-line);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.gr-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--gr-line-soft);
+  font-family: "SF Mono", Consolas, Menlo, monospace;
+  font-size: 12.5px;
+  color: var(--gr-text-faint);
+}
+.gr-panel-status {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--gr-teal);
+  letter-spacing: 0.08em;
+}
+.gr-panel-status .gr-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--gr-teal);
+  animation: gr-pulse 1.6s ease-in-out infinite;
+}
+@keyframes gr-pulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(45, 212, 191, 0.5); }
+  50% { opacity: 0.5; box-shadow: 0 0 0 5px rgba(45, 212, 191, 0); }
+}
+.gr-scan-area {
+  position: relative;
+  height: 340px;
+  background-image: radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+  background-size: 26px 26px;
+  overflow: hidden;
+}
+.gr-scan-sweep {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 140px;
+  background: linear-gradient(90deg, transparent, rgba(45, 212, 191, 0.14) 45%, rgba(45, 212, 191, 0.22) 50%, rgba(45, 212, 191, 0.14) 55%, transparent);
+  animation: gr-sweep 5s linear infinite;
+  filter: blur(0.5px);
+}
+@keyframes gr-sweep {
+  0% { left: -140px; }
+  100% { left: 100%; }
+}
+.gr-finding {
+  position: absolute;
+  background: var(--gr-bg-panel-2);
+  border: 1px solid var(--gr-amber-dim);
+  border-radius: 8px;
+  padding: 12px 16px;
+  max-width: 260px;
+  font-family: "SF Mono", Consolas, Menlo, monospace;
+  font-size: 12.5px;
+  line-height: 1.5;
+  opacity: 0;
+  animation: gr-finding-pop 5s ease-in-out infinite;
+  box-shadow: 0 12px 32px -8px rgba(0, 0, 0, 0.5);
+}
+.gr-finding .gr-finding-label {
+  color: var(--gr-amber);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  display: block;
+  margin-bottom: 4px;
+  font-size: 11px;
+}
+.gr-finding .gr-finding-desc {
+  color: var(--gr-text-dim);
+}
+.gr-finding-1 { top: 42px; left: 8%; animation-delay: 0.3s; }
+.gr-finding-2 {
+  top: 168px;
+  left: 46%;
+  animation-delay: 1.9s;
+  border-color: var(--gr-teal-dim);
+}
+.gr-finding-2 .gr-finding-label { color: var(--gr-teal); }
+.gr-finding-3 {
+  bottom: 28px;
+  left: 14%;
+  animation-delay: 3.5s;
+  border-color: var(--gr-red);
+}
+.gr-finding-3 .gr-finding-label { color: var(--gr-red); }
+@keyframes gr-finding-pop {
+  0%, 100% { opacity: 0; transform: translateY(6px) scale(0.98); }
+  8%, 28% { opacity: 1; transform: translateY(0) scale(1); }
+  36% { opacity: 0; transform: translateY(-4px) scale(0.98); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gr-scan-sweep { animation: none; opacity: 0.4; }
+  .gr-finding {
+    animation: none;
+    opacity: 1;
+    position: static;
+    margin: 12px 16px;
+    display: inline-block;
+  }
+  .gr-panel-status .gr-dot { animation: none; }
+}
+.gr-panel-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+  border-top: 1px solid var(--gr-line-soft);
+  font-family: "SF Mono", Consolas, Menlo, monospace;
+  font-size: 11.5px;
+  color: var(--gr-text-faint);
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* ── Explainer trio ───────────────────────────────────────── */
+.gr-trio {
+  margin-top: 64px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  background: var(--gr-line-soft);
+  border: 1px solid var(--gr-line-soft);
+  border-radius: 12px;
+  overflow: hidden;
+}
+@media (max-width: 720px) {
+  .gr-trio { grid-template-columns: 1fr; }
+}
+.gr-trio-item {
+  background: var(--gr-bg-panel);
+  padding: 26px 24px;
+}
+.gr-trio-item .gr-num {
+  font-family: "SF Mono", Consolas, Menlo, monospace;
+  font-size: 12px;
+  color: var(--gr-amber);
+  margin-bottom: 10px;
+  letter-spacing: 0.05em;
+}
+.gr-trio-item h3 {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 8px;
+  letter-spacing: -0.01em;
+}
+.gr-trio-item p {
+  font-size: 14px;
+  color: var(--gr-text-dim);
+  line-height: 1.6;
+  margin: 0;
+}
+
+/* ── Footer ───────────────────────────────────────────────── */
+.gr-footer {
+  position: relative;
+  z-index: 5;
+  max-width: 1040px;
+  margin: 40px auto 0;
+  padding: 40px clamp(20px, 5vw, 64px) 60px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1px solid var(--gr-line-soft);
+  font-family: "SF Mono", Consolas, Menlo, monospace;
+  font-size: 12px;
+  color: var(--gr-text-faint);
+  flex-wrap: wrap;
+  gap: 12px;
+}

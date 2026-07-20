@@ -16,6 +16,23 @@ export interface CompleteExecutionInput {
   outputHash?: string | null;
   costEstimate?: number | null;
   graphMutationCount?: number | null;
+  // Raw LLM response text (nullable — deterministic agents have no
+  // raw output). Capped at RAW_OUTPUT_MAX_BYTES in `complete` so a
+  // jumbo completion doesn't bloat the table.
+  rawOutput?: string | null;
+}
+
+// 50KB. Discovery / Expansion / CompetitiveAnalysis routinely emit
+// multi-KB structured markets[] / problems[] / solutions[] arrays;
+// 50KB fits normal completions whole and keeps enough of a truncated
+// payload to reason about what happened. Table size cost per row is
+// bounded by this cap.
+export const RAW_OUTPUT_MAX_BYTES = 50_000;
+
+function capRawOutput(raw: string | null | undefined): string | null {
+  if (raw === null || raw === undefined) return null;
+  if (raw.length <= RAW_OUTPUT_MAX_BYTES) return raw;
+  return raw.slice(0, RAW_OUTPUT_MAX_BYTES) + `\n\n[...truncated at ${RAW_OUTPUT_MAX_BYTES} chars; original was ${raw.length} chars]`;
 }
 
 export const agentExecutionLogRepository = {
@@ -42,6 +59,7 @@ export const agentExecutionLogRepository = {
         outputHash: input.outputHash ?? null,
         costEstimate: input.costEstimate ?? null,
         graphMutationCount: input.graphMutationCount ?? null,
+        rawOutput: capRawOutput(input.rawOutput),
         completedAt: new Date(),
       },
     });

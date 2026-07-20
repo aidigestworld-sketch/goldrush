@@ -19,6 +19,8 @@ import { nodeSourceRefRepository } from "../../repositories/nodeSourceRef.reposi
 import { edgeRepository } from "../../repositories/edge.repository";
 import { agentExecutionLogService } from "../../services/agentExecutionLog.service";
 import { prisma } from "../../db/client";
+import { tryResolveProblemIdForRun } from "../../orchestrator/idResolvers";
+import { selectWithinTokenBudget, getInputTokenBudgetForModel } from "../../sandbox/tokenBudget";
 
 export interface CompetitiveAnalysisRunResult {
   existingSolutionsCreated: number;
@@ -28,20 +30,34 @@ export interface CompetitiveAnalysisRunResult {
   skipReason?: string;
 }
 
+// problemId is `string | undefined` (not required): Stripe-originated
+// runs never have a pre-existing trackingKey. The agent resolves via
+// tryResolveProblemIdForRun at its entry point so `id: undefined` can
+// never reach the prisma.problem.findUnique call below.
 export async function runCompetitiveAnalysisAgent(
   runId: string,
-  problemId: string,
+  problemId: string | undefined,
   competitorNamesToEvidenceIds: Map<string, string[]>, // which evidence rows belong to which named competitor
   llm: LLMClient
 ): Promise<CompetitiveAnalysisRunResult> {
-  const problem = await prisma.problem.findUnique({ where: { id: problemId } });
+  const resolvedProblemId = await tryResolveProblemIdForRun(runId, problemId);
+  if (!resolvedProblemId) {
+    return {
+      existingSolutionsCreated: 0,
+      businessModelsCreated: 0,
+      boundedRuleViolations: [],
+      skipped: true,
+      skipReason: "no problemId available",
+    };
+  }
+  const problem = await prisma.problem.findUnique({ where: { id: resolvedProblemId } });
   if (!problem || problem.status !== "active") {
     return {
       existingSolutionsCreated: 0,
       businessModelsCreated: 0,
       boundedRuleViolations: [],
       skipped: true,
-      skipReason: `problem ${problemId} not found or not active`,
+      skipReason: `problem ${resolvedProblemId} not found or not active`,
     };
   }
 
@@ -65,17 +81,41 @@ export async function runCompetitiveAnalysisAgent(
     for (const id of ids) evidenceToCompetitor.set(id, name);
   }
 
-  const documents: CompetitiveAnalysisInputDocument[] = evidenceRows.map((e) => ({
+  // Token-budget selection — same pattern as Discovery / Expansion. All
+  // rows share sourceType='competitor_material' so the selector reduces
+  // to (recency, id). Note: this may unevenly drop rows for one
+  // competitor over another when the corpus is skewed; if that becomes
+  // an issue in practice, add a per-competitor fair-share variant to
+  // tokenBudget.ts.
+  const budgetResult = selectWithinTokenBudget(
+    evidenceRows.map((e) => ({
+      id: e.id,
+      sourceType: "competitor_material",
+      text: e.extractedFact,
+      recencyAt: e.sourcePublishedAt ?? e.fetchedAt ?? null,
+    })),
+    getInputTokenBudgetForModel((llm as { model?: string }).model)
+  );
+  if (budgetResult.droppedCount > 0) {
+    console.warn(
+      `[CompetitiveAnalysis] token-budget: kept ${budgetResult.selected.length}/${evidenceRows.length} evidence rows ` +
+        `(~${budgetResult.totalTokensEstimated} tokens, budget=${budgetResult.budgetTokens}), ` +
+        `dropped by source_type: ${JSON.stringify(budgetResult.droppedBySourceType)}`
+    );
+  }
+
+  const documents: CompetitiveAnalysisInputDocument[] = budgetResult.selected.map((e) => ({
     id: e.id,
     competitorName: evidenceToCompetitor.get(e.id) ?? "unknown",
     sourceType: "competitor_material" as const,
-    text: e.extractedFact,
+    text: e.text,
   }));
 
   return agentExecutionLogService.run(
     { runId, agentName: "CompetitiveAnalysis", modelUsed: (llm as { model?: string }).model ?? null },
-    async () => {
+    async (ctx) => {
       const result = await runCompetitiveAnalysisSandbox(llm, documents);
+      ctx.setRawOutput(result.rawResponse);
 
       if (!result.parsed) {
         throw new Error(`CompetitiveAnalysis Agent output failed schema validation: ${result.validationErrors.join("; ")}`);

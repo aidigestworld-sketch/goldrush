@@ -42,8 +42,9 @@ export async function runIntakeExtractionAgent(
       candidateId: null,
       modelUsed: (llm as { model?: string }).model ?? null,
     },
-    async () => {
+    async (ctx) => {
       const result = await runIntakeExtractionSandbox(llm, input);
+      ctx.setRawOutput(result.rawResponse);
       if (!result.parsed) {
         return {
           output: null,
@@ -72,12 +73,24 @@ export async function runIntakeExtractionAgent(
 //   deriveProfileFromEvidence maps each row's extractedValue to one array
 //   slot — the join means all domain terms from one answer land together.
 //
-// capitalAvailability: the normalized label directly.
+// capitalAvailability / geography: the normalized label directly.
+//
+// teamSize: the integer stringified (e.g. "5"). The deriver parses it
+//   back to a number. "" for null so the empty-string filter keeps the
+//   profile column null instead of coercing to 0.
 //
 // null / empty: "" — deriveProfileFromEvidence filters empty strings so
 //   a nothing-extractable turn leaves no phantom entries in the profile.
 export function extractionOutputToString(output: IntakeExtractionOutput | null): string {
   if (!output) return "";
-  if (output.field === "capitalAvailability") return output.extracted ?? "";
-  return (output.extracted ?? []).join("; ");
+  switch (output.field) {
+    case "capitalAvailability":
+    case "geography":
+      return output.extracted ?? "";
+    case "teamSize":
+      return output.extracted !== null ? String(output.extracted) : "";
+    case "expertise":
+    case "distributionAssets":
+      return (output.extracted ?? []).join("; ");
+  }
 }

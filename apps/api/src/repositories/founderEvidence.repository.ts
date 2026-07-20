@@ -3,12 +3,14 @@
 import { prisma } from "../db/client";
 import type { MustFillField } from "../intake/founderIntakeState";
 
-// The three target_field values mirror FounderFit's source_field enum
+// The five target_field values mirror FounderFit's source_field enum
 // exactly so comparison is direct without a mapping step.
 const TARGET_FIELD_MAP: Record<MustFillField, string> = {
   expertise: "expertise",
   distributionAssets: "distribution_assets",
   capitalAvailability: "capital_availability",
+  teamSize: "team_size",
+  geography: "geography",
 };
 
 export interface CreateFounderEvidenceInput {

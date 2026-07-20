@@ -22,8 +22,10 @@ import { computeOpportunityQuality, type ScoringInputs, type ScoringConfigWeight
 import { scoringConfigRepository } from "../../repositories/scoringConfig.repository";
 import { agentExecutionLogService } from "../../services/agentExecutionLog.service";
 import { prisma } from "../../db/client";
+import { tryResolveCandidateIdForRun } from "../../orchestrator/idResolvers";
 
 export interface ScoringRunResult {
+  candidateId: string | null;
   opportunityQuality: number | null;
   subScores: {
     demand: number;
@@ -38,15 +40,26 @@ export interface ScoringRunResult {
   skipReason?: string;
 }
 
-export async function runScoringAgent(runId: string, candidateId: string, vertical: string): Promise<ScoringRunResult> {
-  const candidate = await prisma.opportunityCandidate.findUnique({ where: { id: candidateId } });
-  if (!candidate) return skip(`candidate ${candidateId} not found`);
-  if (candidate.status !== "candidate") return skip(`candidate ${candidateId} is status='${candidate.status}'`);
+// candidateId is `string | undefined` (not required): fresh runs whose
+// Composition step just produced a candidate don't have a trackingKey
+// in JobData. The agent resolves via tryResolveCandidateIdForRun at
+// its entry point so `id: undefined` can never reach the
+// prisma.opportunityCandidate.findUnique call below.
+export async function runScoringAgent(
+  runId: string,
+  candidateId: string | undefined,
+  vertical: string
+): Promise<ScoringRunResult> {
+  const resolvedCandidateId = await tryResolveCandidateIdForRun(runId, candidateId);
+  if (!resolvedCandidateId) return skip(null, "no candidate found for run");
+  const candidate = await prisma.opportunityCandidate.findUnique({ where: { id: resolvedCandidateId } });
+  if (!candidate) return skip(resolvedCandidateId, `candidate ${resolvedCandidateId} not found`);
+  if (candidate.status !== "candidate") return skip(resolvedCandidateId, `candidate ${resolvedCandidateId} is status='${candidate.status}'`);
   if (candidate.opportunityQuality !== null) {
-    return skip(`candidate ${candidateId} already has opportunity_quality=${candidate.opportunityQuality} — idempotent-by-refusal`);
+    return skip(resolvedCandidateId, `candidate ${resolvedCandidateId} already has opportunity_quality=${candidate.opportunityQuality} — idempotent-by-refusal`);
   }
 
-  const compositionRows = await prisma.opportunityCandidateComposition.findMany({ where: { candidateId } });
+  const compositionRows = await prisma.opportunityCandidateComposition.findMany({ where: { candidateId: resolvedCandidateId } });
   const byRole = new Map(compositionRows.map((r) => [r.role, r.nodeId]));
   const marketId = byRole.get("market");
   const audienceId = byRole.get("audience");
@@ -55,6 +68,7 @@ export async function runScoringAgent(runId: string, candidateId: string, vertic
   const businessModelId = byRole.get("business_model");
   if (!marketId || !audienceId || !problemId || !hypothesisId || !businessModelId) {
     return skip(
+      resolvedCandidateId,
       `candidate composition is incomplete — market=${marketId}, audience=${audienceId}, problem=${problemId}, hypothesis=${hypothesisId}, business_model=${businessModelId}`
     );
   }
@@ -68,9 +82,9 @@ export async function runScoringAgent(runId: string, candidateId: string, vertic
     scoringConfigRepository.latestForVertical(vertical),
   ]);
   if (!market || !audience || !problem || !hypothesis || !businessModel) {
-    return skip("one or more composed rows vanished between composition and scoring lookup");
+    return skip(resolvedCandidateId, "one or more composed rows vanished between composition and scoring lookup");
   }
-  if (!config) return skip(`no scoring_config found for vertical=${vertical}`);
+  if (!config) return skip(resolvedCandidateId, `no scoring_config found for vertical=${vertical}`);
 
   const maturityStage = market.maturityStage as ScoringInputs["market"]["maturityStage"];
   const inputs: ScoringInputs = {
@@ -106,14 +120,15 @@ export async function runScoringAgent(runId: string, candidateId: string, vertic
   };
 
   return agentExecutionLogService.run(
-    { runId, agentName: "Scoring", candidateId, modelUsed: null },
+    { runId, agentName: "Scoring", candidateId: resolvedCandidateId, modelUsed: null },
     async () => {
       const output = computeOpportunityQuality(inputs, weights);
       await prisma.opportunityCandidate.update({
-        where: { id: candidateId },
+        where: { id: resolvedCandidateId },
         data: { opportunityQuality: output.opportunityQuality },
       });
       return {
+        candidateId: resolvedCandidateId,
         opportunityQuality: output.opportunityQuality,
         subScores: output.subScores,
         scoringConfigVersion: config.version,
@@ -124,8 +139,9 @@ export async function runScoringAgent(runId: string, candidateId: string, vertic
   );
 }
 
-function skip(reason: string): ScoringRunResult {
+function skip(candidateId: string | null, reason: string): ScoringRunResult {
   return {
+    candidateId,
     opportunityQuality: null,
     subScores: null,
     scoringConfigVersion: null,

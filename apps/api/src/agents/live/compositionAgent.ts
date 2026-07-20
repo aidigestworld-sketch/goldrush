@@ -38,6 +38,7 @@
 import { composeCandidate, type CompositionInput } from "../composition";
 import { agentExecutionLogService } from "../../services/agentExecutionLog.service";
 import { prisma } from "../../db/client";
+import { tryResolveHypothesisIdForRun } from "../../orchestrator/idResolvers";
 
 export const VALIDATION_GATE_THRESHOLD = 0.5;
 
@@ -49,20 +50,35 @@ export interface CompositionRunResult {
   skipReason?: string;
 }
 
-export async function runCompositionAgent(runId: string, hypothesisId: string): Promise<CompositionRunResult> {
-  const hypothesis = await prisma.hypothesis.findUnique({ where: { id: hypothesisId } });
+// hypothesisId is `string | undefined` (not required). Two things this
+// entry-point resolution buys us:
+//   1. Stripe-originated runs never carry a pre-existing trackingKey —
+//      resolution finds the run's hypothesis via pipelineRunId fallback.
+//   2. If no hypothesis exists for the run (upstream Discovery / Expansion /
+//      Hypothesis all legitimately skipped because Discovery wrote zero
+//      markets, for instance), the agent SKIPS cleanly rather than
+//      throwing — matches the tryResolveProblemIdForRun / tryResolveCandidateIdForRun
+//      pattern used elsewhere in the DAG so the run's status doesn't
+//      falsely flip to 'failed' on a legitimate partial-completion.
+export async function runCompositionAgent(
+  runId: string,
+  hypothesisId: string | undefined
+): Promise<CompositionRunResult> {
+  const resolvedHypothesisId = await tryResolveHypothesisIdForRun(runId, hypothesisId);
+  if (!resolvedHypothesisId) return skip("no active hypothesis for run — upstream Hypothesis step produced no row");
+  const hypothesis = await prisma.hypothesis.findUnique({ where: { id: resolvedHypothesisId } });
   if (!hypothesis || hypothesis.status !== "active") {
-    return skip(`hypothesis ${hypothesisId} not found or not active`);
+    return skip(`hypothesis ${resolvedHypothesisId} not found or not active`);
   }
   if (hypothesis.validationScore === null || hypothesis.validationScore < VALIDATION_GATE_THRESHOLD) {
     return skip(
-      `hypothesis ${hypothesisId} has validation_score=${hypothesis.validationScore} — below gate ${VALIDATION_GATE_THRESHOLD} or not yet scored`
+      `hypothesis ${resolvedHypothesisId} has validation_score=${hypothesis.validationScore} — below gate ${VALIDATION_GATE_THRESHOLD} or not yet scored`
     );
   }
 
   // 1. Problem via hypothesis_sources (expected: exactly one per this
   // project's hypothesis-sources structure).
-  const sources = await prisma.hypothesisSource.findMany({ where: { hypothesisId } });
+  const sources = await prisma.hypothesisSource.findMany({ where: { hypothesisId: resolvedHypothesisId } });
   if (sources.length === 0) {
     return skip("hypothesis has zero hypothesis_sources rows — no problem/existing_solution linkage");
   }
@@ -104,8 +120,21 @@ export async function runCompositionAgent(runId: string, hypothesisId: string): 
     where: { edgeType: "experiences", toId: problem.id, toType: "problem" },
   });
   if (experiencesEdges.length === 0) {
+    // Pre-2026-07-16, Expansion's live wrapper didn't write
+    // experiences edges at all — this branch was the terminal state
+    // for every run and every run silently resolved to
+    // insufficient_evidence regardless of hypothesis strength (see
+    // run d84f73a7). Now that expansionAgent.ts writes them
+    // unconditionally (with a Cartesian fallback when the model
+    // omits experiencing_audience_labels), the only way to land here
+    // is a legitimate structural gap: the problem was created outside
+    // of Expansion (e.g. a partial-completion run whose Expansion
+    // step was retried and produced problems without re-linking to
+    // the earlier audiences, or a manual DB fixup). Keep the skip
+    // — but the message is now diagnostic ("real gap, investigate")
+    // rather than "known missing implementation."
     return skip(
-      `problem ${problem.id} has no experiences edges from any audience — Expansion Agent's live wrapper may not be writing them (known gap in expansionAgent.ts)`
+      `problem ${problem.id} has no experiences edges from any audience — Expansion should have written them; investigate whether this problem was created outside the normal Expansion write path`
     );
   }
   const chosenAudienceId = await pickBestNode(

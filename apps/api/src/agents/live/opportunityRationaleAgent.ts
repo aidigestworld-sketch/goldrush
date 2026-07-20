@@ -24,6 +24,7 @@ import {
 } from "../../sandbox/opportunityRationaleSandbox";
 import { agentExecutionLogService } from "../../services/agentExecutionLog.service";
 import { prisma } from "../../db/client";
+import { selectWithinTokenBudget, getInputTokenBudgetForModel } from "../../sandbox/tokenBudget";
 
 export interface OpportunityRationaleRunResult {
   opportunityId: string;
@@ -96,12 +97,43 @@ export async function runOpportunityRationaleAgent(
       polarityByEvidenceId.set(r.evidenceId, "supporting");
     }
   }
-  const evidence: OpportunityRationaleInput["evidence"] = evidenceRows.map((e) => ({
-    id: e.id,
-    sourceType: e.sourceType,
-    extractedFact: e.extractedFact,
-    polarity: polarityByEvidenceId.get(e.id) ?? "supporting",
-  }));
+  // Token-budget selection over the cited-evidence pool. This pool
+  // spans 5 composition slots and can grow unbounded as Validation
+  // Collector adds citations to hypotheses and CompetitiveAnalysis
+  // adds evidence-backed ExistingSolutions. Applied here (rather than
+  // in the sandbox) so contradictingCount below still reflects the
+  // ground-truth polarity distribution from the full evidence set —
+  // the rationale generator would otherwise under-weight the risk
+  // signal if we truncated first, then counted.
+  const budgetResult = selectWithinTokenBudget(
+    evidenceRows.map((e) => ({
+      id: e.id,
+      sourceType: e.sourceType,
+      text: e.extractedFact,
+      recencyAt: e.sourcePublishedAt ?? e.fetchedAt ?? null,
+    })),
+    getInputTokenBudgetForModel((llm as { model?: string }).model)
+  );
+  if (budgetResult.droppedCount > 0) {
+    console.warn(
+      `[OpportunityRationale] token-budget: kept ${budgetResult.selected.length}/${evidenceRows.length} evidence rows ` +
+        `(~${budgetResult.totalTokensEstimated} tokens, budget=${budgetResult.budgetTokens}), ` +
+        `dropped by source_type: ${JSON.stringify(budgetResult.droppedBySourceType)}`
+    );
+  }
+  const selectedIds = new Set(budgetResult.selected.map((s) => s.id));
+  const evidence: OpportunityRationaleInput["evidence"] = evidenceRows
+    .filter((e) => selectedIds.has(e.id))
+    .map((e) => ({
+      id: e.id,
+      sourceType: e.sourceType,
+      extractedFact: e.extractedFact,
+      polarity: polarityByEvidenceId.get(e.id) ?? "supporting",
+    }));
+  // Contradicting count is computed over the FULL polarity map, not the
+  // budgeted evidence — the risk_summary generator should reflect the
+  // real signal from all citations, not a subsample bias introduced by
+  // token-budget truncation.
   const contradictingCount = [...polarityByEvidenceId.values()].filter((p) => p === "contradicting").length;
 
   // FounderFit gaps — parsed out of the founder_fit_rationale text.
@@ -167,8 +199,9 @@ export async function runOpportunityRationaleAgent(
 
   return agentExecutionLogService.run(
     { runId, agentName: "OpportunityRationale", candidateId: candidate.id, modelUsed: (llm as { model?: string }).model ?? null },
-    async () => {
+    async (ctx) => {
       const result = await runOpportunityRationaleSandbox(llm, input);
+      ctx.setRawOutput(result.rawResponse);
 
       if (!result.parsed) {
         throw new Error(

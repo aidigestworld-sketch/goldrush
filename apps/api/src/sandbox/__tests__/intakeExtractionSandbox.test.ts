@@ -139,6 +139,66 @@ describe("intakeExtractionSandbox — capitalAvailability", () => {
   });
 });
 
+describe("intakeExtractionSandbox — teamSize", () => {
+  it("resolvable head count → number extracted", async () => {
+    const llm = mockLLM(JSON.stringify({ field: "teamSize", extracted: 3 }));
+    const result = await runIntakeExtractionSandbox(llm, {
+      field: "teamSize",
+      question: "How many people are working on this?",
+      rawAnswer: "It's me and two co-founders, three of us full time.",
+    });
+    const extracted = (result.parsed as Extract<IntakeExtractionOutput, { field: "teamSize" }>)?.extracted;
+    expect(extracted).toBe(3);
+    expect(result.validationErrors.length).toBe(0);
+  });
+
+  it("vague 'small team' → null (not guessed)", async () => {
+    const llm = mockLLM(JSON.stringify({ field: "teamSize", extracted: null }));
+    const result = await runIntakeExtractionSandbox(llm, {
+      field: "teamSize",
+      question: "How many people are working on this?",
+      rawAnswer: "A small team.",
+    });
+    const extracted = (result.parsed as Extract<IntakeExtractionOutput, { field: "teamSize" }>)?.extracted;
+    expect(extracted).toBeNull();
+  });
+
+  it("zero rejected by schema (positive integer required) — validation fails", async () => {
+    const llm = mockLLM(JSON.stringify({ field: "teamSize", extracted: 0 }));
+    const result = await runIntakeExtractionSandbox(llm, {
+      field: "teamSize",
+      question: "How many people are working on this?",
+      rawAnswer: "Nobody yet.",
+    });
+    expect(result.parsed).toBeNull();
+    expect(result.validationErrors.length).toBeGreaterThan(0);
+  });
+});
+
+describe("intakeExtractionSandbox — geography", () => {
+  it("specific country extracted", async () => {
+    const llm = mockLLM(JSON.stringify({ field: "geography", extracted: "United States" }));
+    const result = await runIntakeExtractionSandbox(llm, {
+      field: "geography",
+      question: "Where are you based?",
+      rawAnswer: "We're in the United States, mostly the Bay Area.",
+    });
+    const extracted = (result.parsed as Extract<IntakeExtractionOutput, { field: "geography" }>)?.extracted;
+    expect(extracted).toBe("United States");
+  });
+
+  it("vague 'remote' → null (no specific place stated)", async () => {
+    const llm = mockLLM(JSON.stringify({ field: "geography", extracted: null }));
+    const result = await runIntakeExtractionSandbox(llm, {
+      field: "geography",
+      question: "Where are you based?",
+      rawAnswer: "We're fully remote, everywhere.",
+    });
+    const extracted = (result.parsed as Extract<IntakeExtractionOutput, { field: "geography" }>)?.extracted;
+    expect(extracted).toBeNull();
+  });
+});
+
 describe("intakeExtractionSandbox — schema validation", () => {
   it("malformed JSON: parsed is null, validationErrors populated with correct prefix", async () => {
     const llm = mockLLM("this is not json at all");

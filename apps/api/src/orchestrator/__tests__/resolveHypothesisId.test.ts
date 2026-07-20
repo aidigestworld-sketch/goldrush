@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { resolveHypothesisIdForRun } from "../handlers";
+import { resolveHypothesisIdForRun } from "../idResolvers";
 import { prisma } from "../../db/client";
 
 // A stable UUID that won't collide with real run data.

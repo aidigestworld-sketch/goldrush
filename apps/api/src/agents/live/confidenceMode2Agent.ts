@@ -46,9 +46,10 @@ import {
 import { opportunityCandidateRepository } from "../../repositories/opportunityCandidate.repository";
 import { agentExecutionLogService } from "../../services/agentExecutionLog.service";
 import { prisma } from "../../db/client";
+import { tryResolveCandidateIdForRun } from "../../orchestrator/idResolvers";
 
 export interface ConfidenceMode2RunResult {
-  candidateId: string;
+  candidateId: string | null;
   confidenceScore: number | null;
   agreement: number | null;
   freshness: number | null;
@@ -59,27 +60,33 @@ export interface ConfidenceMode2RunResult {
   skipReason?: string;
 }
 
+// candidateId is `string | undefined` (not required). The agent resolves
+// via tryResolveCandidateIdForRun so `id: undefined` can never reach the
+// underlying prisma.opportunityCandidate.findUnique inside
+// opportunityCandidateRepository.findById.
 export async function runConfidenceMode2Agent(
   runId: string,
-  candidateId: string
+  candidateId: string | undefined
 ): Promise<ConfidenceMode2RunResult> {
-  const candidate = await opportunityCandidateRepository.findById(candidateId);
+  const resolvedCandidateId = await tryResolveCandidateIdForRun(runId, candidateId);
+  if (!resolvedCandidateId) return skip(null, "no candidate found for run");
+  const candidate = await opportunityCandidateRepository.findById(resolvedCandidateId);
   if (!candidate) {
-    return skip(candidateId, `opportunity_candidate ${candidateId} not found`);
+    return skip(resolvedCandidateId, `opportunity_candidate ${resolvedCandidateId} not found`);
   }
   // §7 Mode 2 input filter: candidate.status must be 'candidate' AND
   // opportunity_quality must be set (Scoring, stage 9, must have
   // committed first — this branch is downstream of that in the DAG).
   if (candidate.status !== "candidate") {
     return skip(
-      candidateId,
-      `candidate ${candidateId} is status='${candidate.status}', not 'candidate'`
+      resolvedCandidateId,
+      `candidate ${resolvedCandidateId} is status='${candidate.status}', not 'candidate'`
     );
   }
   if (candidate.opportunityQuality === null) {
     return skip(
-      candidateId,
-      `candidate ${candidateId} has opportunity_quality=NULL — Scoring Agent (stage 9) must run first`
+      resolvedCandidateId,
+      `candidate ${resolvedCandidateId} has opportunity_quality=NULL — Scoring Agent (stage 9) must run first`
     );
   }
 
@@ -88,7 +95,7 @@ export async function runConfidenceMode2Agent(
   // Mode 2 — but the pure function handles the incomplete case
   // defensively, so we pass whatever we find rather than pre-rejecting.
   const compositionRows = await prisma.opportunityCandidateComposition.findMany({
-    where: { candidateId },
+    where: { candidateId: resolvedCandidateId },
   });
   const byRole = new Map<CompositionRole, { nodeId: string; nodeType: string }>();
   for (const r of compositionRows) {
@@ -156,7 +163,7 @@ export async function runConfidenceMode2Agent(
     {
       runId,
       agentName: "ConfidenceMode2",
-      candidateId,
+      candidateId: resolvedCandidateId,
       // Deterministic — no model to log. Matches Filtering / Composition
       // / Scoring / Compression conventions (see agent_execution_log
       // schema comment about model_used being NULL for deterministic
@@ -198,7 +205,7 @@ export async function runConfidenceMode2Agent(
   );
 }
 
-function skip(candidateId: string, reason: string): ConfidenceMode2RunResult {
+function skip(candidateId: string | null, reason: string): ConfidenceMode2RunResult {
   return {
     candidateId,
     confidenceScore: null,

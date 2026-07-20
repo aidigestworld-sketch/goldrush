@@ -14,9 +14,12 @@
 //   expertise          → string[] | null  (domain terms)
 //   distributionAssets → string[] | null  (concrete named channels/assets)
 //   capitalAvailability → string | null   (normalized label)
+//   teamSize           → number | null    (integer head count including founder)
+//   geography          → string | null    (normalized region/country label)
 import { z } from "zod";
 import type { LLMClient } from "./llmClient";
 import type { MustFillField } from "../intake/founderIntakeState";
+import { parseLlmJson } from "./parseLlmJson";
 
 // ──────────────────────────────────────────────────────────────────────
 // Input
@@ -52,10 +55,27 @@ const CapitalAvailabilityOutputSchema = z.object({
   extracted: z.string().nullable(),
 });
 
+// teamSize is a positive integer (headcount including the founder).
+// null = not extractable / not stated. Do NOT map missing to 0 or 1 —
+// the sandbox's grounding check treats null as absent and 0/1 as a
+// real value; substituting a placeholder is the same class of bug as
+// the capitalAvailability "unspecified" leak.
+const TeamSizeOutputSchema = z.object({
+  field: z.literal("teamSize"),
+  extracted: z.number().int().positive().nullable(),
+});
+
+const GeographyOutputSchema = z.object({
+  field: z.literal("geography"),
+  extracted: z.string().nullable(),
+});
+
 export const IntakeExtractionOutputSchema = z.discriminatedUnion("field", [
   ExpertiseOutputSchema,
   DistributionAssetsOutputSchema,
   CapitalAvailabilityOutputSchema,
+  TeamSizeOutputSchema,
+  GeographyOutputSchema,
 ]);
 
 export type IntakeExtractionOutput = z.infer<typeof IntakeExtractionOutputSchema>;
@@ -88,6 +108,10 @@ capitalAvailability: Normalize the founder's capital situation into one of these
 - "figuring it out" — capital situation not yet determined
 If the answer does not state the capital situation, return null.
 
+teamSize: Extract the total head count actively working on the business (founder + co-founders + employees + regular contractors). Answer must produce a positive integer. "Solo" / "just me" → 1. "Me and my co-founder" → 2. "A team of five" → 5. Ignore advisors, investors, and one-off freelancers. If the answer is vague ("small team", "a few of us") without a resolvable number, return null — do NOT guess. Return null if the answer is off-topic.
+
+geography: Extract a normalized region/country label naming where the founder and their team are based. Prefer country-level ("United States", "United Kingdom", "Germany"); a specific city is acceptable if the founder states one ("San Francisco, USA"). If the answer names multiple locations, join them ("United States and Germany"). Return null if the answer is vague ("remote", "everywhere") without any specific place, or off-topic. Do NOT infer geography from company name or accent — only from what is explicitly stated.
+
 Respond with ONLY valid JSON — no preamble, no explanation, no markdown fences. The JSON must match one of these shapes depending on the target field:
 
 For expertise:
@@ -97,7 +121,13 @@ For distributionAssets:
 { "field": "distributionAssets", "extracted": string[] | null }
 
 For capitalAvailability:
-{ "field": "capitalAvailability", "extracted": string | null }`;
+{ "field": "capitalAvailability", "extracted": string | null }
+
+For teamSize:
+{ "field": "teamSize", "extracted": number | null }
+
+For geography:
+{ "field": "geography", "extracted": string | null }`;
 
 function buildUserPrompt(input: IntakeExtractionInput): string {
   return `Target field: ${input.field}
@@ -130,9 +160,19 @@ export async function runIntakeExtractionSandbox(
   const validationErrors: string[] = [];
   let parsed: IntakeExtractionOutput | null = null;
 
-  try {
-    const cleaned = rawResponse.trim().replace(/^```json\s*/i, "").replace(/```\s*$/, "");
-    const json = JSON.parse(cleaned);
+  const parseResult = parseLlmJson<unknown>(rawResponse);
+  if (parseResult.error || parseResult.data === null || parseResult.data === undefined) {
+    validationErrors.push(parseResult.error ?? "JSON parse failed: parseLlmJson returned no data");
+  } else if (typeof parseResult.data !== "object" || Array.isArray(parseResult.data)) {
+    // jsonrepair can occasionally coerce a garbage string into a string
+    // primitive or array — that's obviously not the object shape our
+    // schema expects, so surface it as a validation error rather than
+    // letting `"field" in <string>` throw.
+    validationErrors.push(
+      `JSON parse failed: yielded a non-object (${Array.isArray(parseResult.data) ? "array" : typeof parseResult.data}), expected an object with a "field" key`
+    );
+  } else {
+    const json = parseResult.data as Record<string, unknown>;
 
     // Defense: model may omit the "field" discriminator key and just return
     // { "extracted": ... }. Inject it from input so Zod can parse the union.
@@ -146,8 +186,13 @@ export async function runIntakeExtractionSandbox(
     } else {
       // Filter empty strings out of array results — the model occasionally
       // emits [""] which would create phantom entries in the profile.
+      // Only expertise/distributionAssets are array-shaped; the others
+      // (capitalAvailability, teamSize, geography) are scalars/nulls.
       const data = result.data;
-      if (data.field !== "capitalAvailability" && Array.isArray(data.extracted)) {
+      if (
+        (data.field === "expertise" || data.field === "distributionAssets") &&
+        Array.isArray(data.extracted)
+      ) {
         parsed = {
           ...data,
           extracted: (data.extracted as string[]).filter((s) => s.trim().length > 0),
@@ -156,8 +201,6 @@ export async function runIntakeExtractionSandbox(
         parsed = data;
       }
     }
-  } catch (err) {
-    validationErrors.push(`JSON parse failed: ${(err as Error).message}`);
   }
 
   return { rawResponse, parsed, validationErrors };

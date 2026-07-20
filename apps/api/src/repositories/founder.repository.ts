@@ -54,6 +54,8 @@ export const founderRepository = {
         expertise: derived.expertise,
         distributionAssets: derived.distributionAssets,
         capitalAvailability: derived.capitalAvailability,
+        teamSize: derived.teamSize,
+        geography: derived.geography,
         intakeState: intakeState as object,
         lastUpdatedAt: new Date(),
       },

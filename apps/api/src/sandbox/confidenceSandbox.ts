@@ -33,6 +33,7 @@
 // some-answering band [0.55, 0.90].
 import { z } from "zod";
 import type { LLMClient } from "./llmClient";
+import { parseLlmJson } from "./parseLlmJson";
 
 export interface ConfidenceEvidenceItem {
   id: string;
@@ -166,30 +167,6 @@ export interface ConfidenceSandboxResult {
 // Same JSON-extraction logic the bench harness needed — mid-tier
 // models sometimes wrap output in a "Here is the response:" preamble
 // or in code fences. Find the first balanced { ... } block.
-function extractJsonBlock(raw: string): string | null {
-  const start = raw.indexOf("{");
-  if (start === -1) return null;
-  let depth = 0;
-  let inString = false;
-  let escape = false;
-  for (let i = start; i < raw.length; i++) {
-    const ch = raw[i];
-    if (inString) {
-      if (escape) escape = false;
-      else if (ch === "\\") escape = true;
-      else if (ch === '"') inString = false;
-      continue;
-    }
-    if (ch === '"') inString = true;
-    else if (ch === "{") depth++;
-    else if (ch === "}") {
-      depth--;
-      if (depth === 0) return raw.substring(start, i + 1);
-    }
-  }
-  return null;
-}
-
 export async function runConfidenceSandbox(
   llm: LLMClient,
   input: ConfidenceSandboxInput
@@ -201,14 +178,11 @@ export async function runConfidenceSandbox(
   const validationErrors: string[] = [];
   const boundedRuleViolations: string[] = [];
 
-  try {
-    const jsonBlock = extractJsonBlock(rawResponse);
-    if (!jsonBlock) {
-      validationErrors.push("no balanced { ... } block found in response");
-      return { rawResponse, parsed, validationErrors, boundedRuleViolations };
-    }
-    const json = JSON.parse(jsonBlock);
-    const result = ConfidenceOutputSchema.safeParse(json);
+  const parseResult = parseLlmJson(rawResponse);
+  if (parseResult.error) {
+    validationErrors.push(parseResult.error);
+  } else {
+    const result = ConfidenceOutputSchema.safeParse(parseResult.data);
     if (!result.success) {
       validationErrors.push(result.error.toString());
     } else {
@@ -259,8 +233,6 @@ export async function runConfidenceSandbox(
         );
       }
     }
-  } catch (err) {
-    validationErrors.push(`JSON parse failed: ${(err as Error).message}`);
   }
 
   return { rawResponse, parsed, validationErrors, boundedRuleViolations };

@@ -15,6 +15,7 @@ import { marketRepository } from "../../repositories/market.repository";
 import { nodeSourceRefRepository } from "../../repositories/nodeSourceRef.repository";
 import { agentExecutionLogService } from "../../services/agentExecutionLog.service";
 import { prisma } from "../../db/client";
+import { selectWithinTokenBudget, getInputTokenBudgetForModel } from "../../sandbox/tokenBudget";
 
 const ALLOWED_SOURCE_TYPES = ["search_signal", "marketplace", "industry_report", "financial_signal"] as const;
 
@@ -56,16 +57,40 @@ export async function runDiscoveryAgent(runId: string, llm: LLMClient): Promise<
     };
   }
 
-  const documents: DiscoveryInputDocument[] = evidenceRows.map((e) => ({
+  // Token-budget selection: rank docs by source authority + recency, drop
+  // the tail until we fit within DEFAULT_INPUT_TOKEN_BUDGET. Prevents the
+  // NIM 400 "input tokens exceed max" error class that recurs as evidence
+  // accumulates over time (07:34 UTC 2026-07-15: 272 rows / 508K chars /
+  // ~127K tokens on shopify_subscriptions blew past the 128K context).
+  // See tokenBudget.ts header for the ranking + budget rationale.
+  const budgetResult = selectWithinTokenBudget(
+    evidenceRows.map((e) => ({
+      id: e.id,
+      sourceType: e.sourceType,
+      text: e.extractedFact,
+      recencyAt: e.sourcePublishedAt ?? e.fetchedAt ?? null,
+    })),
+    getInputTokenBudgetForModel((llm as { model?: string }).model)
+  );
+  if (budgetResult.droppedCount > 0) {
+    console.warn(
+      `[Discovery] token-budget: kept ${budgetResult.selected.length}/${evidenceRows.length} evidence rows ` +
+        `(~${budgetResult.totalTokensEstimated} tokens, budget=${budgetResult.budgetTokens}), ` +
+        `dropped by source_type: ${JSON.stringify(budgetResult.droppedBySourceType)}`
+    );
+  }
+
+  const documents: DiscoveryInputDocument[] = budgetResult.selected.map((e) => ({
     id: e.id,
     sourceType: e.sourceType as (typeof ALLOWED_SOURCE_TYPES)[number],
-    text: e.extractedFact,
+    text: e.text,
   }));
 
   return agentExecutionLogService.run(
     { runId, agentName: "Discovery", modelUsed: (llm as { model?: string }).model ?? null },
-    async () => {
+    async (ctx) => {
       const result = await runDiscoverySandbox(llm, documents);
+      ctx.setRawOutput(result.rawResponse);
 
       if (!result.parsed) {
         throw new Error(`Discovery Agent output failed schema validation: ${result.validationErrors.join("; ")}`);

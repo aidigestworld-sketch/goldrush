@@ -60,6 +60,8 @@ import type { LLMClient } from "../../sandbox/llmClient";
 import { hypothesisRepository } from "../../repositories/hypothesis.repository";
 import { agentExecutionLogService } from "../../services/agentExecutionLog.service";
 import { prisma } from "../../db/client";
+import { tryResolveHypothesisIdForRun } from "../../orchestrator/idResolvers";
+import { selectWithinTokenBudget, getInputTokenBudgetForModel } from "../../sandbox/tokenBudget";
 
 // Gate threshold. OPPORTUNITY_ENGINE.md §5.2 phrases the default as
 // "net-positive after cluster and confidence weighting"; the sandbox
@@ -80,12 +82,28 @@ export interface ConfidenceRunResult {
   skipReason?: string;
 }
 
+// hypothesisId is `string | undefined` (not required). Skips cleanly if
+// no hypothesis exists for the run (upstream Hypothesis legitimately
+// produced no row) — same rationale as validationAgent / compositionAgent.
 export async function runConfidenceAgent(
   runId: string,
-  hypothesisId: string,
+  hypothesisId: string | undefined,
   llm: LLMClient
 ): Promise<ConfidenceRunResult> {
-  const hypothesis = await hypothesisRepository.findById(hypothesisId);
+  const resolvedHypothesisId = await tryResolveHypothesisIdForRun(runId, hypothesisId);
+  if (!resolvedHypothesisId) {
+    return {
+      validationScore: null,
+      distinctSupportingSources: null,
+      distinctContradictingSources: null,
+      gatePassed: null,
+      deprecatedForFailedValidation: false,
+      boundedRuleViolations: [],
+      skipped: true,
+      skipReason: "no active hypothesis for run — upstream Hypothesis step produced no row",
+    };
+  }
+  const hypothesis = await hypothesisRepository.findById(resolvedHypothesisId);
   if (!hypothesis || hypothesis.status !== "active") {
     return {
       validationScore: null,
@@ -95,7 +113,7 @@ export async function runConfidenceAgent(
       deprecatedForFailedValidation: false,
       boundedRuleViolations: [],
       skipped: true,
-      skipReason: `hypothesis ${hypothesisId} not found or not active`,
+      skipReason: `hypothesis ${resolvedHypothesisId} not found or not active`,
     };
   }
   // Mode 1's input filter (AI_AGENTS.md §7): status='active' AND
@@ -109,7 +127,7 @@ export async function runConfidenceAgent(
       deprecatedForFailedValidation: false,
       boundedRuleViolations: [],
       skipped: true,
-      skipReason: `hypothesis ${hypothesisId} already has validation_score=${hypothesis.validationScore} — Confidence is idempotent-by-refusal on re-runs`,
+      skipReason: `hypothesis ${resolvedHypothesisId} already has validation_score=${hypothesis.validationScore} — Confidence is idempotent-by-refusal on re-runs`,
     };
   }
 
@@ -140,10 +158,52 @@ export async function runConfidenceAgent(
     sourceAuthorityTier: e.sourceAuthorityTier,
     text: e.extractedFact,
   });
-  const evidenceFor: ConfidenceEvidenceItem[] = evidenceRows
+
+  // Token-budget selection over cited evidence — same pattern as
+  // Discovery / Expansion / CompetitiveAnalysis / Validation. As
+  // Validation Collector adds citations over successive runs, the
+  // cited-evidence pool per hypothesis grows unbounded. Wired here
+  // to preempt the same input-token-overflow class Validation hit
+  // on 2026-07-16. Note: the budget is applied to the model's
+  // qualitative-reasoning input; backendFacts below is still
+  // computed from the FULL evidence rows so distinct-source counts
+  // and highest-tier stay ground-truth (V8 responsibility split —
+  // see confidenceSandbox.ts header).
+  const budgetResult = selectWithinTokenBudget(
+    evidenceRows.map((e) => ({
+      id: e.id,
+      sourceType: e.sourceType,
+      text: e.extractedFact,
+      recencyAt: e.sourcePublishedAt ?? e.fetchedAt ?? null,
+    })),
+    getInputTokenBudgetForModel((llm as { model?: string }).model)
+  );
+  if (budgetResult.droppedCount > 0) {
+    console.warn(
+      `[Confidence] token-budget: kept ${budgetResult.selected.length}/${evidenceRows.length} evidence rows ` +
+        `(~${budgetResult.totalTokensEstimated} tokens, budget=${budgetResult.budgetTokens}), ` +
+        `dropped by source_type: ${JSON.stringify(budgetResult.droppedBySourceType)}`
+    );
+  }
+  const budgetedIds = new Set(budgetResult.selected.map((s) => s.id));
+  const budgetedEvidenceRows = evidenceRows.filter((e) => budgetedIds.has(e.id));
+
+  const evidenceFor: ConfidenceEvidenceItem[] = budgetedEvidenceRows
     .filter((e) => polarityByEvidenceId.get(e.id) === "supporting")
     .map(toItem);
-  const evidenceAgainst: ConfidenceEvidenceItem[] = evidenceRows
+  const evidenceAgainst: ConfidenceEvidenceItem[] = budgetedEvidenceRows
+    .filter((e) => polarityByEvidenceId.get(e.id) === "contradicting")
+    .map(toItem);
+
+  // backendFacts computed from FULL evidenceRows (not budgeted) so the
+  // counts + highest-tier signals remain ground truth — the V8
+  // responsibility split assumes these are unimpeachable. Truncating
+  // here would give the model a subsample-biased count as if it were
+  // the truth.
+  const fullEvidenceFor: ConfidenceEvidenceItem[] = evidenceRows
+    .filter((e) => polarityByEvidenceId.get(e.id) === "supporting")
+    .map(toItem);
+  const fullEvidenceAgainst: ConfidenceEvidenceItem[] = evidenceRows
     .filter((e) => polarityByEvidenceId.get(e.id) === "contradicting")
     .map(toItem);
 
@@ -165,21 +225,22 @@ export async function runConfidenceAgent(
   // exported AUTHORITY_TIER_RANK so the ordering stays one source of
   // truth across sandbox and agent.
   const backendFacts: ConfidenceBackendFacts = {
-    distinctSupportingSources: new Set(evidenceFor.map((e) => e.sourceUrlOrIdentifier)).size,
-    distinctContradictingSources: new Set(evidenceAgainst.map((e) => e.sourceUrlOrIdentifier)).size,
-    highestSupportingTier: highestAuthorityTier(evidenceFor),
-    highestContradictingTier: highestAuthorityTier(evidenceAgainst),
+    distinctSupportingSources: new Set(fullEvidenceFor.map((e) => e.sourceUrlOrIdentifier)).size,
+    distinctContradictingSources: new Set(fullEvidenceAgainst.map((e) => e.sourceUrlOrIdentifier)).size,
+    highestSupportingTier: highestAuthorityTier(fullEvidenceFor),
+    highestContradictingTier: highestAuthorityTier(fullEvidenceAgainst),
   };
 
   return agentExecutionLogService.run(
     { runId, agentName: "Confidence", candidateId: null, modelUsed: (llm as { model?: string }).model ?? null },
-    async () => {
+    async (ctx) => {
       const result = await runConfidenceSandbox(llm, {
         hypothesisStatement: hypothesis.statement,
         evidenceFor,
         evidenceAgainst,
         backendFacts,
       });
+      ctx.setRawOutput(result.rawResponse);
 
       if (!result.parsed) {
         throw new Error(`Confidence Agent output failed schema validation: ${result.validationErrors.join("; ")}`);

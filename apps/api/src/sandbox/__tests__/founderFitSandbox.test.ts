@@ -113,6 +113,8 @@ class RealCapGoodMockLLM implements LLMClient {
 const EV_EXPERTISE = "a1b2c3d4-e5f6-7890-abcd-ef1234567890";
 const EV_DIST      = "b2c3d4e5-f6a7-8901-bcde-f01234567891";
 const EV_CAP       = "c3d4e5f6-a7b8-9012-cdef-012345678912";
+const EV_TEAM      = "d4e5f6a7-b8c9-0123-def0-123456789123";
+const EV_GEO       = "e5f6a7b8-c9d0-1234-ef01-234567891234";
 
 const nonLegacyInput: FounderFitSandboxInput = {
   founder: {
@@ -120,6 +122,8 @@ const nonLegacyInput: FounderFitSandboxInput = {
     expertise: ["Shopify app development"],
     distributionAssets: ["Newsletter with 5,000 DTC brand operator subscribers"],
     capitalAvailability: "$50K available",
+    teamSize: 3,
+    geography: "United States",
     founderEvidence: [
       {
         id: EV_EXPERTISE,
@@ -139,6 +143,18 @@ const nonLegacyInput: FounderFitSandboxInput = {
         extractedValue: "$50K available",
         rawAnswer: "I have around fifty thousand dollars I can put in before needing outside money.",
       },
+      {
+        id: EV_TEAM,
+        targetField: "team_size",
+        extractedValue: "3",
+        rawAnswer: "It's me and two co-founders — three of us working on it full time.",
+      },
+      {
+        id: EV_GEO,
+        targetField: "geography",
+        extractedValue: "United States",
+        rawAnswer: "We're all based in the United States, mostly the Bay Area.",
+      },
     ],
     isLegacy: false,
   },
@@ -151,6 +167,8 @@ const nullCapInput: FounderFitSandboxInput = {
     expertise: ["Shopify API integrations"],
     distributionAssets: [],
     capitalAvailability: null,
+    teamSize: null,
+    geography: null,
     founderEvidence: [],
     isLegacy: true,
   },
@@ -352,5 +370,168 @@ describe("founderFitSandbox — legacy regression", () => {
     const legacyReg = await runFounderFitSandbox(new LegacyCapMatchLLM(), founderFitInputDistribution);
     expect(legacyReg.parsed).not.toBeNull();
     expect(legacyReg.boundedRuleViolations.length).toBe(0);
+  });
+
+  it("legacy founder with 5 required fields (all provided) — legacy path unchanged, no violations", async () => {
+    // The single legacy fixture founder (isLegacy: true, zero evidence) still
+    // scores fine against a well-grounded matched_strength claim on any of
+    // the 5 fields — the coverage widening from 3→5 does not change the
+    // fallback semantics for pre-Intake-Engine founders.
+    class LegacyGeoMatchLLM implements LLMClient {
+      async complete(): Promise<string> {
+        return JSON.stringify({
+          founder_fit_score: 55,
+          matched_strengths: [
+            {
+              source_field: "geography",
+              matched_value: "United Kingdom",
+              why_it_matters: "Founder is UK-based and the target buyer set is UK-heavy DTC subscription operators.",
+            },
+          ],
+          gaps: ["No stated Shopify API technical expertise."],
+          rationale: "Geographic overlap with the target buyer helps go-to-market. Technical gap dominates the score.",
+        });
+      }
+    }
+    const legacyGeo = await runFounderFitSandbox(new LegacyGeoMatchLLM(), founderFitInputDistribution);
+    expect(legacyGeo.parsed).not.toBeNull();
+    expect(legacyGeo.boundedRuleViolations.length).toBe(0);
+  });
+});
+
+describe("founderFitSandbox — teamSize grounding (legacy path)", () => {
+  it("claiming a teamSize matched_strength that matches the profile passes", async () => {
+    class LegacyTeamMatchLLM implements LLMClient {
+      async complete(): Promise<string> {
+        return JSON.stringify({
+          founder_fit_score: 45,
+          matched_strengths: [
+            {
+              source_field: "team_size",
+              matched_value: "2",
+              why_it_matters: "Two full-time founders can plausibly divide the build/GTM work — enough surface area to execute.",
+            },
+          ],
+          gaps: ["No dedicated Shopify API technical expertise stated."],
+          rationale: "Team size is workable; expertise breadth is the real gap.",
+        });
+      }
+    }
+    const result = await runFounderFitSandbox(new LegacyTeamMatchLLM(), founderFitInputDistribution);
+    expect(result.boundedRuleViolations.length).toBe(0);
+  });
+
+  it("claiming teamSize matched_strength when profile teamSize=null fires a violation", async () => {
+    class LegacyTeamHallucinationLLM implements LLMClient {
+      async complete(): Promise<string> {
+        return JSON.stringify({
+          founder_fit_score: 60,
+          matched_strengths: [
+            {
+              source_field: "team_size",
+              matched_value: "5",
+              why_it_matters: "Large team can cover both build and GTM.",
+            },
+          ],
+          gaps: [],
+          rationale: "Team is strong across the board.",
+        });
+      }
+    }
+    const result = await runFounderFitSandbox(new LegacyTeamHallucinationLLM(), nullCapInput);
+    expect(result.boundedRuleViolations.length).toBeGreaterThan(0);
+    expect(result.boundedRuleViolations.some((v) => v.includes("team_size"))).toBe(true);
+  });
+});
+
+describe("founderFitSandbox — geography grounding (legacy path)", () => {
+  it("claiming geography matched_strength when profile geography=null fires a violation", async () => {
+    class LegacyGeoHallucinationLLM implements LLMClient {
+      async complete(): Promise<string> {
+        return JSON.stringify({
+          founder_fit_score: 60,
+          matched_strengths: [
+            {
+              source_field: "geography",
+              matched_value: "United States",
+              why_it_matters: "US-based founder is well positioned for the US-heavy target market.",
+            },
+          ],
+          gaps: [],
+          rationale: "Good regional fit, US market alignment is a real advantage here.",
+        });
+      }
+    }
+    const result = await runFounderFitSandbox(new LegacyGeoHallucinationLLM(), nullCapInput);
+    expect(result.boundedRuleViolations.length).toBeGreaterThan(0);
+    expect(result.boundedRuleViolations.some((v) => v.includes("geography"))).toBe(true);
+  });
+});
+
+describe("founderFitSandbox — teamSize/geography evidence-id grounding (non-legacy)", () => {
+  it("well-cited teamSize evidence passes grounding", async () => {
+    class GoodTeamGroundedLLM implements LLMClient {
+      async complete(): Promise<string> {
+        return JSON.stringify({
+          founder_fit_score: 60,
+          matched_strengths: [
+            {
+              source_field: "team_size",
+              founder_evidence_id: EV_TEAM,
+              matched_value: "3",
+              why_it_matters: "Three-person team can plausibly execute both build and go-to-market in parallel.",
+            },
+          ],
+          gaps: ["Capital is thin relative to the CAC of DTC subscription operators."],
+          rationale: "Team size and expertise are adequate; capital is the operational constraint.",
+        });
+      }
+    }
+    const result = await runFounderFitSandbox(new GoodTeamGroundedLLM(), nonLegacyInput);
+    expect(result.boundedRuleViolations.length).toBe(0);
+  });
+
+  it("well-cited geography evidence passes grounding", async () => {
+    class GoodGeoGroundedLLM implements LLMClient {
+      async complete(): Promise<string> {
+        return JSON.stringify({
+          founder_fit_score: 55,
+          matched_strengths: [
+            {
+              source_field: "geography",
+              founder_evidence_id: EV_GEO,
+              matched_value: "United States",
+              why_it_matters: "US-based team can serve the US-heavy target buyer set without time-zone or regulatory friction.",
+            },
+          ],
+          gaps: [],
+          rationale: "Geographic fit removes go-to-market friction that a non-US team would face.",
+        });
+      }
+    }
+    const result = await runFounderFitSandbox(new GoodGeoGroundedLLM(), nonLegacyInput);
+    expect(result.boundedRuleViolations.length).toBe(0);
+  });
+
+  it("teamSize claim citing a wrong-field evidence id fires a field-mismatch violation", async () => {
+    class TeamWrongFieldLLM implements LLMClient {
+      async complete(): Promise<string> {
+        return JSON.stringify({
+          founder_fit_score: 55,
+          matched_strengths: [
+            {
+              source_field: "team_size",
+              founder_evidence_id: EV_EXPERTISE,
+              matched_value: "3",
+              why_it_matters: "Three-person team.",
+            },
+          ],
+          gaps: [],
+          rationale: "Good team fit — three founders can cover build plus GTM.",
+        });
+      }
+    }
+    const result = await runFounderFitSandbox(new TeamWrongFieldLLM(), nonLegacyInput);
+    expect(result.boundedRuleViolations.some((v) => v.includes("field mismatch"))).toBe(true);
   });
 });

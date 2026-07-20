@@ -1,0 +1,169 @@
+{
+  "studyStart": "2026-07-19T05:56:46.958Z",
+  "studyEnd": "2026-07-19T06:40:27.244Z",
+  "results": [
+    {
+      "profile": {
+        "key": "P1",
+        "description": "Strong technical (full-stack) + existing SaaS audience + funded",
+        "trackingKey": "f17e0001-0000-0000-0000-000000000001",
+        "founderId": "a94e0c97-7844-4e87-9c7f-5d79e16b948e"
+      },
+      "runId": "345d382c-577d-4acc-9125-185e82d18acc",
+      "startedAt": "2026-07-19T05:56:46.958Z",
+      "finishedAt": "2026-07-19T06:04:07.788Z",
+      "wallClockMs": 440830,
+      "overallStatus": "completed",
+      "failedSteps": [],
+      "numHypotheses": 1,
+      "numCandidates": 1,
+      "candidate": {
+        "id": "3651537f-43b6-494d-8d2f-7683c0fa1c9d",
+        "opportunityQuality": 0.47,
+        "founderFitScore": 80,
+        "ventureScore": 0.569,
+        "confidenceScore": 1,
+        "coverageGate": true,
+        "incompleteComposition": false
+      },
+      "promoted": true,
+      "opportunityId": "9f05139f-b9f0-477c-925d-b41c69a5b493",
+      "nim504Count": 0,
+      "nimCallCount": 12,
+      "nimTimingMsTotal": 429817
+    },
+    {
+      "profile": {
+        "key": "P2",
+        "description": "Non-technical marketing + no channels + bootstrapped",
+        "trackingKey": "f17e0001-0000-0000-0000-000000000002",
+        "founderId": "4ca210f3-9d01-4a11-bc73-40ef510b8433"
+      },
+      "runId": "da474055-bcc9-45fa-a020-b5ff54a73907",
+      "startedAt": "2026-07-19T06:04:07.850Z",
+      "finishedAt": "2026-07-19T06:14:08.740Z",
+      "wallClockMs": 600890,
+      "overallStatus": "failed",
+      "failedSteps": [
+        {
+          "step": "discovery",
+          "error": "UnrecoverableError: NIM API error (model=nvidia/nvidia-nemotron-nano-9b-v2): 504 \n  caused by: Error: NIM API error (model=nvidia/nvidia-nemotron-nano-9b-v2): 504 "
+        }
+      ],
+      "numHypotheses": 0,
+      "numCandidates": 0,
+      "candidate": null,
+      "promoted": false,
+      "opportunityId": null,
+      "nim504Count": 0,
+      "nimCallCount": 2,
+      "nimTimingMsTotal": 588382
+    },
+    {
+      "profile": {
+        "key": "P3",
+        "description": "Ecommerce operator + Shopify audience + bootstrapped",
+        "trackingKey": "f17e0001-0000-0000-0000-000000000003",
+        "founderId": "7e0d92d1-24f0-4fd1-a03a-b84420674d4d"
+      },
+      "runId": "2ee7167e-d517-4c02-8892-57e6ce6292bb",
+      "startedAt": "2026-07-19T06:14:08.752Z",
+      "finishedAt": "2026-07-19T06:19:13.194Z",
+      "wallClockMs": 304442,
+      "overallStatus": "failed",
+      "failedSteps": [
+        {
+          "step": "discovery",
+          "error": "UnrecoverableError: NIM API error (model=nvidia/nvidia-nemotron-nano-9b-v2): 504 \n  caused by: Error: NIM API error (model=nvidia/nvidia-nemotron-nano-9b-v2): 504 "
+        }
+      ],
+      "numHypotheses": 0,
+      "numCandidates": 0,
+      "candidate": null,
+      "promoted": false,
+      "opportunityId": null,
+      "nim504Count": 0,
+      "nimCallCount": 1,
+      "nimTimingMsTotal": 302365
+    },
+    {
+      "profile": {
+        "key": "P4",
+        "description": "Generic SaaS founder + no channels + still figuring out capital (aae43d53 profile-match)",
+        "trackingKey": "f17e0001-0000-0000-0000-000000000004",
+        "founderId": "9f63a7f7-4890-42c1-a44d-552b135a1073"
+      },
+      "runId": "d569d6f7-c116-40b9-8c82-1f6cc4579922",
+      "startedAt": "2026-07-19T06:19:13.225Z",
+      "finishedAt": "2026-07-19T06:27:37.994Z",
+      "wallClockMs": 504769,
+      "overallStatus": "completed",
+      "failedSteps": [],
+      "numHypotheses": 0,
+      "numCandidates": 0,
+      "candidate": null,
+      "promoted": false,
+      "opportunityId": null,
+      "nim504Count": 1,
+      "nimCallCount": 7,
+      "nimTimingMsTotal": 496214
+    },
+    {
+      "profile": {
+        "key": "P5",
+        "description": "Strong distribution (VP Growth) + weak technical + funded",
+        "trackingKey": "f17e0001-0000-0000-0000-000000000005",
+        "founderId": "a4ba0a10-3d7d-43f6-b5bc-80fc974234e7"
+      },
+      "runId": "f5bc91df-c59a-422e-ad1c-1161d0667048",
+      "startedAt": "2026-07-19T06:27:38.008Z",
+      "finishedAt": "2026-07-19T06:35:22.722Z",
+      "wallClockMs": 464714,
+      "overallStatus": "completed",
+      "failedSteps": [],
+      "numHypotheses": 1,
+      "numCandidates": 1,
+      "candidate": {
+        "id": "329bf516-2568-4070-b4e6-b97db94cc1e8",
+        "opportunityQuality": 0.45,
+        "founderFitScore": 60,
+        "ventureScore": 0.495,
+        "confidenceScore": 1,
+        "coverageGate": true,
+        "incompleteComposition": false
+      },
+      "promoted": true,
+      "opportunityId": "8659042f-69ab-4060-82bd-d5d8fec01c16",
+      "nim504Count": 0,
+      "nimCallCount": 12,
+      "nimTimingMsTotal": 459939
+    },
+    {
+      "profile": {
+        "key": "P6",
+        "description": "Ex-Shopify PM + no audience yet + funded",
+        "trackingKey": "f17e0001-0000-0000-0000-000000000006",
+        "founderId": "690c37bb-16a9-4f70-be0a-93329f8b9a7e"
+      },
+      "runId": "4ce10447-b597-43e2-ae5e-b12e1e5af190",
+      "startedAt": "2026-07-19T06:35:22.734Z",
+      "finishedAt": "2026-07-19T06:40:27.193Z",
+      "wallClockMs": 304459,
+      "overallStatus": "failed",
+      "failedSteps": [
+        {
+          "step": "discovery",
+          "error": "UnrecoverableError: NIM API error (model=nvidia/nvidia-nemotron-nano-9b-v2): 504 \n  caused by: Error: NIM API error (model=nvidia/nvidia-nemotron-nano-9b-v2): 504 "
+        }
+      ],
+      "numHypotheses": 0,
+      "numCandidates": 0,
+      "candidate": null,
+      "promoted": false,
+      "opportunityId": null,
+      "nim504Count": 0,
+      "nimCallCount": 1,
+      "nimTimingMsTotal": 302187
+    }
+  ]
+}

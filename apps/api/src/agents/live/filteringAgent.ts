@@ -3,18 +3,48 @@
 // pure function; this wrapper only does the graph read, applies the
 // pure decision function, and commits the deprecations.
 //
-// DAG POSITION: runs after Expansion (stage 2), before CompetitiveAnalysis
-// (stage 4). At that point in a fresh run, Market/Audience/Problem
-// exist (Discovery + Expansion have written them) but ExistingSolution/
-// BusinessModel do not yet (CompetitiveAnalysis hasn't run) and
-// Hypothesis certainly not (stage 5). So this wrapper scopes itself
-// to the three node types Filtering can actually see at its DAG
-// position — Market, Audience, Problem — and leaves the later-created
-// types alone. Running it on later types would either misfire (they
-// don't exist yet on a normal DAG traversal) or overreach outside
-// stage 3's charter.
+// SCOPE: filters MARKET and PROBLEM only. Deliberately excludes
+// AUDIENCE, updated 2026-07-16 after run 58895448 investigation.
 //
-// Writes ONLY: UPDATE {market,audience,problem} SET status='deprecated',
+// Original scope was {market, audience, problem} — the three node
+// types created by stages 1–2 (Discovery + Expansion). The rationale
+// was DAG-position: those are what Filtering can see at stage 3.
+// That reason is accidental. The real reason to include a node type
+// in Filtering is SEMANTIC: it must carry a meaningful confidence
+// signal that Filtering can act on.
+//
+//   * Market — Discovery emits `confidence` per market grounded in
+//     demand/industry-report signal strength. Real signal → filter it.
+//   * Problem — `problemRepository.create` derives `confidence`
+//     deterministically from severity_signal and frequency_signal
+//     (see problem.repository.ts:19-24), both of which the
+//     expansionSandbox requires to be grounded in verbatim source-
+//     text quotes (severity_evidence_quote / frequency_evidence_quote).
+//     Real signal, evidence-grounded → filter it.
+//   * Audience — the expansionSandbox's AudienceCandidateSchema is
+//     {label, description, evidence_refs} only. No confidence field,
+//     because there's no observable proxy for "how confident are we
+//     that this demographic segment exists" — audience is a
+//     categorical identifier, not a scored assertion. Audiences are
+//     written to the DB with confidence=NULL by construction.
+//
+// Including audience in Filtering meant Filtering deprecated every
+// audience Expansion produced (confidence=NULL triggers the
+// "missing_confidence" branch in filtering.ts). That silently killed
+// Composition's audience-lookup — no active audience → no candidate →
+// insufficient_evidence, regardless of hypothesis strength. Root
+// cause of run 58895448's zero-candidate result. The correct fix is
+// to remove audience from Filtering's scope, not to force a
+// confidence value onto audiences that no observable proxy grounds.
+//
+// If audience quality-scoring ever becomes a real requirement (e.g.
+// multiple audiences per market with varying evidence support), the
+// right move is a new pure function with its own signal (e.g.
+// distinct-source-count per audience), NOT bolting a made-up
+// confidence number onto the audience schema. See the observable-
+// proxy invariant expansionSandbox.ts:5-8 for why.
+//
+// Writes ONLY: UPDATE {market,problem} SET status='deprecated',
 // deprecation_reason=... on rows below the confidence threshold or
 // with NULL confidence. NEVER touches confidence itself, never
 // touches other node types, never touches evidence/edges.
@@ -31,7 +61,7 @@ export const DEFAULT_MIN_CONFIDENCE = 0.5;
 
 export interface FilteringRunResult {
   perType: {
-    nodeType: "market" | "audience" | "problem";
+    nodeType: "market" | "problem";
     totalConsidered: number;
     deprecated: { id: string; deprecationReason: string }[];
     survived: number;
@@ -41,11 +71,11 @@ export interface FilteringRunResult {
   skipReason?: string;
 }
 
-// Table-driven so each node type's read+write pair is one place;
-// same 6-node-type pattern as compositionAgent.ts's filterActiveByType
-// helper but limited to the 3 types Filtering is scoped to per the
-// DAG header note above.
-type ScopedNodeType = "market" | "audience" | "problem";
+// Table-driven so each node type's read+write pair is one place.
+// Scoped to types that carry a meaningful confidence signal —
+// see the semantic-scope discussion in the file header for why
+// audience is deliberately excluded.
+type ScopedNodeType = "market" | "problem";
 
 // Loads only the current run's active nodes of a given type.
 // Migration 009 added pipeline_run_id — before this filter, Filtering
@@ -61,13 +91,6 @@ async function loadActive(nodeType: ScopedNodeType, pipelineRunId: string): Prom
     });
     return rows.map((r) => ({ id: r.id, confidence: r.confidence }));
   }
-  if (nodeType === "audience") {
-    const rows = await prisma.audience.findMany({
-      where: { status: "active", pipelineRunId },
-      select: { id: true, confidence: true },
-    });
-    return rows.map((r) => ({ id: r.id, confidence: r.confidence }));
-  }
   const rows = await prisma.problem.findMany({
     where: { status: "active", pipelineRunId },
     select: { id: true, confidence: true },
@@ -78,7 +101,6 @@ async function loadActive(nodeType: ScopedNodeType, pipelineRunId: string): Prom
 async function deprecate(nodeType: ScopedNodeType, id: string, reason: string) {
   const data = { status: "deprecated" as const, deprecationReason: reason };
   if (nodeType === "market") return prisma.market.update({ where: { id }, data });
-  if (nodeType === "audience") return prisma.audience.update({ where: { id }, data });
   return prisma.problem.update({ where: { id }, data });
 }
 
@@ -94,7 +116,7 @@ export async function runFilteringAgent(
       const perType: FilteringRunResult["perType"] = [];
       let totalDeprecated = 0;
 
-      for (const nodeType of ["market", "audience", "problem"] as ScopedNodeType[]) {
+      for (const nodeType of ["market", "problem"] as ScopedNodeType[]) {
         const nodes = await loadActive(nodeType, runId);
         const decisions = applyFiltering(nodes, { minConfidence });
         const deprecated: { id: string; deprecationReason: string }[] = [];

@@ -46,7 +46,7 @@ afterAll(async () => {
 describe("(1) first turn (no answer)", () => {
   it("sequencer returns expertise opener; fieldTarget=expertise; not done; not follow-up; questionCount increments", () => {
     let state = emptyIntakeState();
-    const profile: FounderProfile = { expertise: [], distributionAssets: [], capitalAvailability: null };
+    const profile: FounderProfile = { expertise: [], distributionAssets: [], capitalAvailability: null, teamSize: null, geography: null };
     const seq = nextQuestion(state, profile);
     expect(!seq.done).toBe(true);
     expect(!seq.done && seq.nextQuestion === QUESTIONS.expertise.opener).toBe(true);
@@ -59,12 +59,12 @@ describe("(1) first turn (no answer)", () => {
   });
 });
 
-describe("(2)+(3) full three-field cycle + profile reflection", () => {
-  it("expertise → distribution → capital writes profile to DB and marks done; 3 evidence rows created", async () => {
+describe("(2)+(3) full five-field cycle + profile reflection", () => {
+  it("expertise → distribution → capital → teamSize → geography writes profile to DB and marks done; 5 evidence rows created", async () => {
     const founderId = await createTestFounder();
     try {
       let state = emptyIntakeState();
-      let profile: FounderProfile = { expertise: [], distributionAssets: [], capitalAvailability: null };
+      let profile: FounderProfile = { expertise: [], distributionAssets: [], capitalAvailability: null, teamSize: null, geography: null };
 
       // Turn 1 — expertise
       state = recordFieldAsked(state, "expertise");
@@ -82,7 +82,7 @@ describe("(2)+(3) full three-field cycle + profile reflection", () => {
       });
 
       const f1 = await founderRepository.findById(founderId);
-      profile = { expertise: (f1!.expertise ?? []) as string[], distributionAssets: [], capitalAvailability: null };
+      profile = { expertise: (f1!.expertise ?? []) as string[], distributionAssets: [], capitalAvailability: null, teamSize: null, geography: null };
       expect(profile.expertise.length > 0).toBe(true);
       expect(profile.expertise.some((e) => e.includes("Shopify"))).toBe(true);
 
@@ -108,6 +108,8 @@ describe("(2)+(3) full three-field cycle + profile reflection", () => {
         expertise: (f2!.expertise ?? []) as string[],
         distributionAssets: (f2!.distributionAssets ?? []) as string[],
         capitalAvailability: null,
+        teamSize: null,
+        geography: null,
       };
       const seq3 = nextQuestion(state, profile);
       expect(!seq3.done && seq3.fieldTarget === "capitalAvailability").toBe(true);
@@ -129,7 +131,60 @@ describe("(2)+(3) full three-field cycle + profile reflection", () => {
         expertise: (f3!.expertise ?? []) as string[],
         distributionAssets: (f3!.distributionAssets ?? []) as string[],
         capitalAvailability: f3!.capitalAvailability as string | null,
+        teamSize: null,
+        geography: null,
       };
+
+      // Turn 4 — teamSize
+      const seq4 = nextQuestion(state, profile);
+      expect(!seq4.done && seq4.fieldTarget === "teamSize").toBe(true);
+      state = recordFieldAsked(state, "teamSize");
+      const ext4 = await runIntakeExtractionSandbox(
+        mockLLM(JSON.stringify({ field: "teamSize", extracted: 3 })),
+        { field: "teamSize", question: QUESTIONS.teamSize.opener, rawAnswer: "Me and two co-founders — three of us." }
+      );
+      state = recordFieldAnswer(state, "teamSize", "Me and two co-founders — three of us.");
+      await founderRepository.saveIntakeTurn(founderId, state, {
+        targetField: "teamSize",
+        questionAsked: QUESTIONS.teamSize.opener,
+        rawAnswer: "Me and two co-founders — three of us.",
+        extractedValue: extractionOutputToString(ext4.parsed),
+      });
+
+      const f4 = await founderRepository.findById(founderId);
+      profile = {
+        expertise: (f4!.expertise ?? []) as string[],
+        distributionAssets: (f4!.distributionAssets ?? []) as string[],
+        capitalAvailability: f4!.capitalAvailability as string | null,
+        teamSize: f4!.teamSize as number | null,
+        geography: null,
+      };
+
+      // Turn 5 — geography
+      const seq5 = nextQuestion(state, profile);
+      expect(!seq5.done && seq5.fieldTarget === "geography").toBe(true);
+      state = recordFieldAsked(state, "geography");
+      const ext5 = await runIntakeExtractionSandbox(
+        mockLLM(JSON.stringify({ field: "geography", extracted: "United States" })),
+        { field: "geography", question: QUESTIONS.geography.opener, rawAnswer: "We're all US-based." }
+      );
+      state = recordFieldAnswer(state, "geography", "We're all US-based.");
+      await founderRepository.saveIntakeTurn(founderId, state, {
+        targetField: "geography",
+        questionAsked: QUESTIONS.geography.opener,
+        rawAnswer: "We're all US-based.",
+        extractedValue: extractionOutputToString(ext5.parsed),
+      });
+
+      const f5 = await founderRepository.findById(founderId);
+      profile = {
+        expertise: (f5!.expertise ?? []) as string[],
+        distributionAssets: (f5!.distributionAssets ?? []) as string[],
+        capitalAvailability: f5!.capitalAvailability as string | null,
+        teamSize: f5!.teamSize as number | null,
+        geography: f5!.geography as string | null,
+      };
+
       const seqFinal = nextQuestion(state, profile);
       expect(seqFinal.done).toBe(true);
       expect(seqFinal.done && !seqFinal.terminatedByCap).toBe(true);
@@ -137,13 +192,17 @@ describe("(2)+(3) full three-field cycle + profile reflection", () => {
       const finalState = markIntakeComplete(state);
       expect(finalState.completedAt).not.toBeNull();
       expect(checkCoverage(finalState).complete).toBe(true);
-      expect(f3!.capitalAvailability).toBe("$150K raised");
+      expect(f5!.capitalAvailability).toBe("$150K raised");
+      expect(f5!.teamSize).toBe(3);
+      expect(f5!.geography).toBe("United States");
 
       const evidenceRows = await founderEvidenceRepository.findByFounderId(founderId);
-      expect(evidenceRows.length).toBe(3);
+      expect(evidenceRows.length).toBe(5);
       expect(evidenceRows.some((r) => r.targetField === "expertise")).toBe(true);
       expect(evidenceRows.some((r) => r.targetField === "distribution_assets")).toBe(true);
       expect(evidenceRows.some((r) => r.targetField === "capital_availability")).toBe(true);
+      expect(evidenceRows.some((r) => r.targetField === "team_size")).toBe(true);
+      expect(evidenceRows.some((r) => r.targetField === "geography")).toBe(true);
     } finally {
       await cleanupFounder(founderId);
     }
@@ -156,6 +215,8 @@ describe("(4) contradiction flags", () => {
       expertise: ["solopreneur, built all tools myself"],
       distributionAssets: [],
       capitalAvailability: null,
+      teamSize: null,
+      geography: null,
     };
     const flag = detectContradiction(profile, "distributionAssets", "my team has built a strong distribution network");
     expect(flag).not.toBeNull();
@@ -170,20 +231,20 @@ describe("(4) contradiction flags", () => {
   });
 
   it("bootstrapped↔raised: flag detected with correct field1", () => {
-    const profile: FounderProfile = { expertise: [], distributionAssets: [], capitalAvailability: "bootstrapped" };
+    const profile: FounderProfile = { expertise: [], distributionAssets: [], capitalAvailability: "bootstrapped", teamSize: null, geography: null };
     const flag = detectContradiction(profile, "capitalAvailability", "we raised a $500K seed round from three VCs");
     expect(flag).not.toBeNull();
     expect(flag?.field1).toBe("capitalAvailability");
   });
 
   it("raised↔bootstrapped (reverse direction): flag detected", () => {
-    const profile: FounderProfile = { expertise: [], distributionAssets: [], capitalAvailability: "raised $1.2M Series A" };
+    const profile: FounderProfile = { expertise: [], distributionAssets: [], capitalAvailability: "raised $1.2M Series A", teamSize: null, geography: null };
     const flag = detectContradiction(profile, "capitalAvailability", "I'm fully self-funded, bootstrapped");
     expect(flag).not.toBeNull();
   });
 
   it("clean answer: no contradiction → null", () => {
-    const profile: FounderProfile = { expertise: ["Shopify app developer"], distributionAssets: [], capitalAvailability: null };
+    const profile: FounderProfile = { expertise: ["Shopify app developer"], distributionAssets: [], capitalAvailability: null, teamSize: null, geography: null };
     const flag = detectContradiction(profile, "distributionAssets", "I have a newsletter with 3,000 Shopify merchants");
     expect(flag).toBeNull();
   });
@@ -263,5 +324,11 @@ describe("(6) agent live wrapper", () => {
     expect(extractionOutputToString({ field: "capitalAvailability", extracted: "$200K raised" })).toBe("$200K raised");
     expect(extractionOutputToString({ field: "distributionAssets", extracted: null })).toBe("");
     expect(extractionOutputToString({ field: "distributionAssets", extracted: [] })).toBe("");
+    expect(extractionOutputToString({ field: "teamSize", extracted: 3 })).toBe("3");
+    // teamSize null → "" (NOT "0" — verifying we don't repeat the
+    // capitalAvailability "unspecified" placeholder-string bug for the int field)
+    expect(extractionOutputToString({ field: "teamSize", extracted: null })).toBe("");
+    expect(extractionOutputToString({ field: "geography", extracted: "United States" })).toBe("United States");
+    expect(extractionOutputToString({ field: "geography", extracted: null })).toBe("");
   });
 });

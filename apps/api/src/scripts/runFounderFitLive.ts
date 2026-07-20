@@ -118,6 +118,8 @@ async function runPreview(hypothesisId: string, founderId: string, llm: NimLLMCl
       expertise: founder.expertise ?? [],
       distributionAssets: founder.distributionAssets ?? [],
       capitalAvailability: founder.capitalAvailability ?? null,
+      teamSize: founder.teamSize ?? null,
+      geography: founder.geography ?? null,
       founderEvidence,
       isLegacy: founderEvidence.length === 0,
     },

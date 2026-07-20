@@ -39,10 +39,12 @@ import { opportunityCandidateRepository } from "../../repositories/opportunityCa
 import { edgeRepository } from "../../repositories/edge.repository";
 import { agentExecutionLogService } from "../../services/agentExecutionLog.service";
 import { prisma } from "../../db/client";
+import { tryResolveCandidateIdForRun } from "../../orchestrator/idResolvers";
 
 export const MINIMUM_FIT_THRESHOLD = 25;
 
 export interface FounderFitRunResult {
+  candidateId: string | null;
   founderFitScore: number | null;
   founderFitRationale: string | null;
   fitEdgeType: "fits" | "does_not_fit" | null;
@@ -53,32 +55,39 @@ export interface FounderFitRunResult {
   skipReason?: string;
 }
 
+// candidateId is `string | undefined` (not required). The agent resolves
+// via tryResolveCandidateIdForRun so `id: undefined` can never reach the
+// underlying prisma.opportunityCandidate.findUnique inside
+// opportunityCandidateRepository.findById.
 export async function runFounderFitAgent(
   runId: string,
-  candidateId: string,
+  candidateId: string | undefined,
   founderId: string,
   llm: LLMClient
 ): Promise<FounderFitRunResult> {
+  const resolvedCandidateId = await tryResolveCandidateIdForRun(runId, candidateId);
+  if (!resolvedCandidateId) return skip(null, "no candidate found for run");
   const [founder, candidate, founderEvidenceRows] = await Promise.all([
     founderRepository.findById(founderId),
-    opportunityCandidateRepository.findById(candidateId),
+    opportunityCandidateRepository.findById(resolvedCandidateId),
     founderEvidenceRepository.findByFounderId(founderId),
   ]);
   if (!founder) {
-    return skip(`founder ${founderId} not found`);
+    return skip(resolvedCandidateId, `founder ${founderId} not found`);
   }
   if (!candidate) {
-    return skip(`opportunity_candidate ${candidateId} not found`);
+    return skip(resolvedCandidateId, `opportunity_candidate ${resolvedCandidateId} not found`);
   }
   // Mode input filter per §9: candidate must be 'candidate' status
   // AND opportunity_quality must already be set (Scoring must have
   // run first — DAG dependency).
   if (candidate.status !== "candidate") {
-    return skip(`candidate ${candidateId} is status='${candidate.status}', not 'candidate'`);
+    return skip(resolvedCandidateId, `candidate ${resolvedCandidateId} is status='${candidate.status}', not 'candidate'`);
   }
   if (candidate.opportunityQuality === null) {
     return skip(
-      `candidate ${candidateId} has opportunity_quality=NULL — Scoring Agent must run first (DAG stage 9 → 10b)`
+      resolvedCandidateId,
+      `candidate ${resolvedCandidateId} has opportunity_quality=NULL — Scoring Agent must run first (DAG stage 9 → 10b)`
     );
   }
 
@@ -87,13 +96,14 @@ export async function runFounderFitAgent(
   // two specifically as the sources for the opportunity's
   // requirements summary.
   const compositionRows = await prisma.opportunityCandidateComposition.findMany({
-    where: { candidateId },
+    where: { candidateId: resolvedCandidateId },
   });
   const marketId = compositionRows.find((r) => r.role === "market")?.nodeId;
   const businessModelId = compositionRows.find((r) => r.role === "business_model")?.nodeId;
   if (!marketId || !businessModelId) {
     return skip(
-      `candidate ${candidateId} composition is incomplete (market=${marketId ?? "MISSING"}, business_model=${businessModelId ?? "MISSING"}) — Composition must have committed all 5 role rows`
+      resolvedCandidateId,
+      `candidate ${resolvedCandidateId} composition is incomplete (market=${marketId ?? "MISSING"}, business_model=${businessModelId ?? "MISSING"}) — Composition must have committed all 5 role rows`
     );
   }
   const [market, businessModel] = await Promise.all([
@@ -102,6 +112,7 @@ export async function runFounderFitAgent(
   ]);
   if (!market || !businessModel) {
     return skip(
+      resolvedCandidateId,
       `composed rows missing at DB level (market=${market ? "ok" : "MISSING"}, business_model=${businessModel ? "ok" : "MISSING"})`
     );
   }
@@ -135,11 +146,14 @@ export async function runFounderFitAgent(
       id: founder.id,
       expertise: founder.expertise ?? [],
       distributionAssets: founder.distributionAssets ?? [],
-      // Pass null through directly — founderFitSandbox.ts handles null by
-      // showing "[not provided]" in the prompt and treating the field as an
-      // empty set in the bounded-rule check so no matched_strength can be
-      // constructed from an absent capital_availability value.
+      // Pass null through directly for every nullable scalar —
+      // founderFitSandbox.ts handles null by showing "[not provided]" in
+      // the prompt and treating the field as an empty set in the
+      // bounded-rule check so no matched_strength can be constructed
+      // from an absent value.
       capitalAvailability: founder.capitalAvailability ?? null,
+      teamSize: founder.teamSize ?? null,
+      geography: founder.geography ?? null,
       founderEvidence,
       // Legacy = no interview answers exist (pre-Intake Engine founder).
       // String-matching fallback applies; no evidence_id citations required.
@@ -155,11 +169,12 @@ export async function runFounderFitAgent(
     {
       runId,
       agentName: "FounderFit",
-      candidateId,
+      candidateId: resolvedCandidateId,
       modelUsed: (llm as { model?: string }).model ?? null,
     },
-    async () => {
+    async (ctx) => {
       const result = await runFounderFitSandbox(llm, sandboxInput);
+      ctx.setRawOutput(result.rawResponse);
 
       if (!result.parsed) {
         throw new Error(
@@ -168,6 +183,7 @@ export async function runFounderFitAgent(
       }
       if (result.boundedRuleViolations.length > 0) {
         return {
+          candidateId: resolvedCandidateId,
           founderFitScore: null,
           founderFitRationale: null,
           fitEdgeType: null,
@@ -190,6 +206,7 @@ export async function runFounderFitAgent(
       await edgeRepository.create(fitEdgeType, founder.id, "founder", candidate.id, "opportunity_candidate");
 
       return {
+        candidateId: resolvedCandidateId,
         founderFitScore: result.parsed.founder_fit_score,
         founderFitRationale: result.parsed.rationale,
         fitEdgeType,
@@ -206,8 +223,9 @@ export async function runFounderFitAgent(
   );
 }
 
-function skip(reason: string): FounderFitRunResult {
+function skip(candidateId: string | null, reason: string): FounderFitRunResult {
   return {
+    candidateId,
     founderFitScore: null,
     founderFitRationale: null,
     fitEdgeType: null,

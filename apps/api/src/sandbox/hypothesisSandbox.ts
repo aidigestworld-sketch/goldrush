@@ -25,6 +25,7 @@
 // equivalent.
 import { z } from "zod";
 import type { LLMClient } from "./llmClient";
+import { parseLlmJson } from "./parseLlmJson";
 
 export interface HypothesisInputProblem {
   id: string;
@@ -146,15 +147,6 @@ export interface HypothesisSandboxResult {
   boundedRuleViolations: string[];
 }
 
-// Extract the JSON object from a raw model response, tolerating prose
-// preamble or markdown fences (e.g. "Based on the problem provided...\n{...}").
-function extractAndClean(raw: string): string {
-  const first = raw.indexOf("{");
-  const last = raw.lastIndexOf("}");
-  if (first !== -1 && last > first) return raw.slice(first, last + 1);
-  return raw.trim().replace(/^```json\s*/i, "").replace(/```\s*$/, "");
-}
-
 export async function runHypothesisSandbox(
   llm: LLMClient,
   input: HypothesisSandboxInput
@@ -166,10 +158,11 @@ export async function runHypothesisSandbox(
   const validationErrors: string[] = [];
   const boundedRuleViolations: string[] = [];
 
-  try {
-    const cleaned = extractAndClean(rawResponse);
-    const json = JSON.parse(cleaned);
-    const result = HypothesisOutputSchema.safeParse(json);
+  const parseResult = parseLlmJson(rawResponse);
+  if (parseResult.error) {
+    validationErrors.push(parseResult.error);
+  } else {
+    const result = HypothesisOutputSchema.safeParse(parseResult.data);
     if (!result.success) {
       validationErrors.push(result.error.toString());
     } else {
@@ -211,8 +204,6 @@ export async function runHypothesisSandbox(
         }
       }
     }
-  } catch (err) {
-    validationErrors.push(`JSON parse failed: ${(err as Error).message}`);
   }
 
   return { rawResponse, parsed, validationErrors, boundedRuleViolations };

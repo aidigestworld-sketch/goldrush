@@ -78,6 +78,7 @@ model AgentExecutionLog {
   attemptNumber      Int                   @default(1) @map("attempt_number")
   costEstimate       Decimal?              @map("cost_estimate") @db.Decimal
   graphMutationCount Int?                  @map("graph_mutation_count")
+  rawOutput          String?               @map("raw_output")
   candidate          OpportunityCandidate? @relation(fields: [candidateId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   run                PipelineRun?          @relation(fields: [runId], references: [runId], onDelete: NoAction, onUpdate: NoAction)
 

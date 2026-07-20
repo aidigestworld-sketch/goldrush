@@ -20,6 +20,7 @@
 // isLegacy becomes false and the full grounding discipline applies.
 import { z } from "zod";
 import type { LLMClient } from "./llmClient";
+import { parseLlmJson } from "./parseLlmJson";
 
 // ──────────────────────────────────────────────────────────────────────
 // Types
@@ -30,7 +31,12 @@ import type { LLMClient } from "./llmClient";
 // comparison is a direct string equality, no mapping needed.
 export interface FounderEvidenceRecord {
   id: string;   // UUID — what the model must cite in founder_evidence_id
-  targetField: "expertise" | "distribution_assets" | "capital_availability";
+  targetField:
+    | "expertise"
+    | "distribution_assets"
+    | "capital_availability"
+    | "team_size"
+    | "geography";
   extractedValue: string;
   rawAnswer: string;
 }
@@ -39,10 +45,16 @@ export interface FounderFitProfile {
   id: string;
   expertise: string[];
   distributionAssets: string[];
-  // null = not provided. The prompt shows "[not provided]" and the
-  // bounded-rule treats it as an empty set (no matched_strength can
-  // be constructed from an absent field).
+  // Nullable scalars — null means "founder did not state a value".
+  // Prompt renders "[not provided]" and the bounded-rule treats each
+  // as an empty set (no matched_strength can be constructed from an
+  // absent field). Do NOT substitute a placeholder string like
+  // "unspecified" — that would pass the bounded-rule substring check
+  // and defeat the grounding discipline. Same null-safety pattern is
+  // applied uniformly across all three nullable scalars from the start.
   capitalAvailability: string | null;
+  teamSize: number | null;
+  geography: string | null;
   // Interview answer trail for citation. Empty → isLegacy must be true.
   founderEvidence: FounderEvidenceRecord[];
   // true  = founder was inserted before the Intake Engine existed.
@@ -67,7 +79,13 @@ export interface FounderFitSandboxInput {
 // ──────────────────────────────────────────────────────────────────────
 
 const MatchedStrengthSchema = z.object({
-  source_field: z.enum(["expertise", "distribution_assets", "capital_availability"]),
+  source_field: z.enum([
+    "expertise",
+    "distribution_assets",
+    "capital_availability",
+    "team_size",
+    "geography",
+  ]),
   // Required for non-legacy profiles. UUID of the specific
   // founder_evidence row that grounds this strength claim.
   // Legacy profiles may omit or null this field.
@@ -95,7 +113,7 @@ Your job: given ONE founder's profile and an opportunity's requirements, judge h
 
 FRAMING for the requirements summary you'll receive: any business-model or economics information in the requirements ("Competitive benchmark: ...", "operational complexity signal: ...", "capital intensity signal: ...", "margin profile: ...") describes the CLOSEST EXISTING COMPETITOR's model. It is the cost/margin/pricing/complexity structure the founder would be COMPETING AGAINST, not a plan the founder would run. Frame capital and complexity gaps in that light — say "the founder would need to compete against [competitor]'s [transaction-fee / capital-heavy / low-margin / etc.] model with only [their capital]" rather than implying the founder would run that model themselves.
 
-The single most important rule: every "matched_strength" you claim MUST correspond to something that actually appears in the founder's profile — their real expertise entries, real distribution_assets entries, or their stated capital_availability. Do NOT invent a capability, asset, or strength the founder's profile doesn't actually list, even if it would make the fit story cleaner. If the founder's profile has an empty distribution_assets array, you cannot claim they have any distribution advantage — that becomes a gap instead.
+The single most important rule: every "matched_strength" you claim MUST correspond to something that actually appears in the founder's profile — their real expertise entries, real distribution_assets entries, their stated capital_availability, their stated team_size, or their stated geography. Do NOT invent a capability, asset, headcount, or location the founder's profile doesn't actually list, even if it would make the fit story cleaner. If any of these fields is empty or [not provided], you cannot claim an advantage from it — that becomes a gap instead. In particular: team_size and geography being "[not provided]" means UNKNOWN, not "solo" and not any default region — treat unknown as a gap, do not guess.
 
 Also identify gaps: what does this opportunity require that the founder's profile does NOT show they have? Be honest about these even when the overall fit is otherwise decent. When a gap is about capital or operational complexity, frame it as "would need to compete against [named competitor]'s [specific model attribute]" whenever the requirements name a specific competitor benchmark — that phrasing sharpens the reader's ability to judge the actual competitive dynamic.
 
@@ -109,7 +127,7 @@ This founder's profile is backed by specific interview answers. The [evidence_tr
 Respond with ONLY valid JSON matching this exact shape, no other text:
 {
   "founder_fit_score": number (0 to 100),
-  "matched_strengths": [{ "source_field": "expertise" | "distribution_assets" | "capital_availability", "founder_evidence_id": "<uuid from evidence_trail>", "matched_value": string, "why_it_matters": string }],
+  "matched_strengths": [{ "source_field": "expertise" | "distribution_assets" | "capital_availability" | "team_size" | "geography", "founder_evidence_id": "<uuid from evidence_trail>", "matched_value": string, "why_it_matters": string }],
   "gaps": string[],
   "rationale": string
 }`;
@@ -121,7 +139,7 @@ NOTE: This founder was created before the interview system existed (legacy profi
 Respond with ONLY valid JSON matching this exact shape, no other text:
 {
   "founder_fit_score": number (0 to 100),
-  "matched_strengths": [{ "source_field": "expertise" | "distribution_assets" | "capital_availability", "matched_value": string, "why_it_matters": string }],
+  "matched_strengths": [{ "source_field": "expertise" | "distribution_assets" | "capital_availability" | "team_size" | "geography", "matched_value": string, "why_it_matters": string }],
   "gaps": string[],
   "rationale": string
 }`;
@@ -136,10 +154,22 @@ function buildUserPrompt(input: FounderFitSandboxInput): string {
       ? `capital_availability: ${input.founder.capitalAvailability}`
       : `capital_availability: [not provided — treat as unknown, do NOT cite in matched_strengths]`;
 
+  const teamSizeLine =
+    input.founder.teamSize !== null
+      ? `team_size: ${input.founder.teamSize}`
+      : `team_size: [not provided — treat as unknown, do NOT cite in matched_strengths]`;
+
+  const geographyLine =
+    input.founder.geography !== null
+      ? `geography: ${input.founder.geography}`
+      : `geography: [not provided — treat as unknown, do NOT cite in matched_strengths]`;
+
   const profileSection = `[founder id="${input.founder.id}"]
 expertise: ${JSON.stringify(input.founder.expertise)}
 distribution_assets: ${JSON.stringify(input.founder.distributionAssets)}
 ${capitalLine}
+${teamSizeLine}
+${geographyLine}
 [/founder]`;
 
   let evidenceSection = "";
@@ -190,10 +220,11 @@ export async function runFounderFitSandbox(
   const validationErrors: string[] = [];
   const boundedRuleViolations: string[] = [];
 
-  try {
-    const cleaned = rawResponse.trim().replace(/^```json\s*/i, "").replace(/```\s*$/, "");
-    const json = JSON.parse(cleaned);
-    const result = FounderFitOutputSchema.safeParse(json);
+  const parseResult = parseLlmJson(rawResponse);
+  if (parseResult.error) {
+    validationErrors.push(parseResult.error);
+  } else {
+    const result = FounderFitOutputSchema.safeParse(parseResult.data);
     if (!result.success) {
       validationErrors.push(result.error.toString());
     } else {
@@ -201,7 +232,9 @@ export async function runFounderFitSandbox(
 
       if (input.founder.isLegacy) {
         // ── Legacy path: original string-matching fallback ──────────
-        // capitalAvailability null → empty set (same fix as before).
+        // Every nullable scalar → empty set when null, so the bidirectional
+        // substring check below can never match against a placeholder.
+        // teamSize is stringified because the check operates on text.
         const profileValuesByField: Record<string, string[]> = {
           expertise: input.founder.expertise,
           distribution_assets: input.founder.distributionAssets,
@@ -209,6 +242,10 @@ export async function runFounderFitSandbox(
             input.founder.capitalAvailability !== null
               ? [input.founder.capitalAvailability]
               : [],
+          team_size:
+            input.founder.teamSize !== null ? [String(input.founder.teamSize)] : [],
+          geography:
+            input.founder.geography !== null ? [input.founder.geography] : [],
         };
         for (const m of parsed.matched_strengths) {
           const realValues = profileValuesByField[m.source_field] ?? [];
@@ -272,8 +309,6 @@ export async function runFounderFitSandbox(
         }
       }
     }
-  } catch (err) {
-    validationErrors.push(`JSON parse failed: ${(err as Error).message}`);
   }
 
   return { rawResponse, parsed, validationErrors, boundedRuleViolations };

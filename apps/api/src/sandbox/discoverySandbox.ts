@@ -14,6 +14,7 @@
 // complaint text would test the wrong agent boundary.
 import { z } from "zod";
 import type { LLMClient } from "./llmClient";
+import { parseLlmJson } from "./parseLlmJson";
 
 // --- Input: documents matching Discovery's actual allowed source types ---
 export interface DiscoveryInputDocument {
@@ -84,15 +85,6 @@ export interface DiscoverySandboxResult {
   boundedRuleViolations: string[]; // markets that parsed fine per schema but still violate AI_AGENTS.md §1 invariants
 }
 
-// Extract the JSON object from a raw model response, tolerating prose
-// preamble or markdown fences (e.g. "Here is the extracted JSON:\n{...}").
-function extractAndClean(raw: string): string {
-  const first = raw.indexOf("{");
-  const last = raw.lastIndexOf("}");
-  if (first !== -1 && last > first) return raw.slice(first, last + 1);
-  return raw.trim().replace(/^```json\s*/i, "").replace(/```\s*$/, "");
-}
-
 export async function runDiscoverySandbox(
   llm: LLMClient,
   documents: DiscoveryInputDocument[]
@@ -104,10 +96,11 @@ export async function runDiscoverySandbox(
   const validationErrors: string[] = [];
   const boundedRuleViolations: string[] = [];
 
-  try {
-    const cleaned = extractAndClean(rawResponse);
-    const json = JSON.parse(cleaned);
-    const result = DiscoveryOutputSchema.safeParse(json);
+  const parseResult = parseLlmJson(rawResponse);
+  if (parseResult.error) {
+    validationErrors.push(parseResult.error);
+  } else {
+    const result = DiscoveryOutputSchema.safeParse(parseResult.data);
     if (result.success) {
       parsed = result.data;
       const validDocIds = new Set(documents.map((d) => d.id));
@@ -122,8 +115,6 @@ export async function runDiscoverySandbox(
     } else {
       validationErrors.push(result.error.toString());
     }
-  } catch (err) {
-    validationErrors.push(`JSON parse failed: ${(err as Error).message}`);
   }
 
   return { rawResponse, parsed, validationErrors, boundedRuleViolations };

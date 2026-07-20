@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "tsx watch -r dotenv/config src/scripts/runOrchestratorServer.ts",
     "start": "tsx -r dotenv/config src/scripts/runOrchestratorServer.ts",
-    "test": "vitest run"
+    "test": "vitest run",
+    "db:migrate:supabase": "tsx -r dotenv/config src/scripts/applySupabaseMigrations.ts",
+    "db:migrate:supabase:list": "tsx -r dotenv/config src/scripts/listSupabaseMigrations.ts"
   },
   "keywords": [],
   "author": "",
@@ -29,6 +31,7 @@
     "prisma": "^7.8.0",
     "stripe": "^22.3.1",
     "turndown": "^7.2.4",
+    "undici": "^7.24.4",
     "zod": "^4.4.3"
   },
   "devDependencies": {
@@ -37,6 +40,7 @@
     "@types/node": "^26.1.0",
     "@types/pg": "^8.20.0",
     "@types/turndown": "^5.0.6",
+    "supabase": "^2.109.1",
     "tsx": "^4.23.0",
     "typescript": "^6.0.3",
     "vitest": "^4.1.10"

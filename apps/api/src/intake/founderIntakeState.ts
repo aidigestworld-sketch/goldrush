@@ -19,13 +19,30 @@
 // Types
 // ──────────────────────────────────────────────────────────────────────
 
-export type MustFillField = "expertise" | "distributionAssets" | "capitalAvailability";
+export type MustFillField =
+  | "expertise"
+  | "distributionAssets"
+  | "capitalAvailability"
+  | "teamSize"
+  | "geography";
 
 export const MUST_FILL_FIELDS: readonly MustFillField[] = [
   "expertise",
   "distributionAssets",
   "capitalAvailability",
+  "teamSize",
+  "geography",
 ];
+
+// Explicitly deferred fields — not part of MUST-fill until they're wired
+// through extraction + grounding + rule consumption. Listed here so the
+// intent is visible at the type layer, not just in prose.
+//   audienceAssets: pending schema/usage diff — appears to duplicate
+//     distributionAssets (question already asks about "existing audience").
+//   constraints: unstructured free-text; scope of what a "constraint" is
+//     hasn't been narrowed enough to extract or consume.
+//   industries: reserved for vertical-routing (which pipeline vertical
+//     to run), not for FounderFit's per-candidate matching.
 
 // Depth is observability-only — does NOT gate completion (same discipline
 // as scoringInputProvenance/freshnessSources). Kept alongside the
@@ -65,15 +82,33 @@ export interface FounderIntakeState {
   questionCount: number;
   completedAt: string | null;   // ISO 8601, null until all MUST-fill fields asked
   contradictionFlags: ContradictionFlag[];
+  // The question currently awaiting a founder answer, or null if none is
+  // outstanding (either never-asked or the last-asked question was already
+  // answered). Set by recordFieldAsked/recordFollowUpAsked; cleared by
+  // recordFieldAnswer. Enables idempotent fresh-turn calls: the handler
+  // returns this pending question WITHOUT re-advancing state when a
+  // client accidentally makes two rawAnswer=undefined calls (React 18
+  // StrictMode double-effect, page refresh mid-request, etc.).
+  //
+  // Optional field (?) for backward-compat with existing intake_state
+  // jsonb rows written before this was added — those read as `undefined`,
+  // which the fresh-turn path treats as "no known pending question,
+  // advance normally", preserving prior behavior for that first call.
+  pendingQuestion?: { fieldTarget: MustFillField; isFollowUp: boolean } | null;
 }
 
 // The current profile values — passed separately from the intake state
-// because they live on the founder table's own columns (expertise[],
-// distributionAssets[], capitalAvailability?), not inside the jsonb blob.
+// because they live on the founder table's own columns, not inside the
+// jsonb blob. null on a nullable field means "not stated" — do NOT
+// substitute a placeholder string like "unspecified", or the sandbox's
+// bounded-rule check will accept it as a real value (the mistake that
+// caused the original capitalAvailability grounding leak).
 export interface FounderProfile {
   expertise: string[];
   distributionAssets: string[];
   capitalAvailability: string | null;
+  teamSize: number | null;
+  geography: string | null;
 }
 
 export interface CoverageResult {
@@ -101,10 +136,13 @@ export function emptyIntakeState(): FounderIntakeState {
       expertise: emptyField(),
       distributionAssets: emptyField(),
       capitalAvailability: emptyField(),
+      teamSize: emptyField(),
+      geography: emptyField(),
     },
     questionCount: 0,
     completedAt: null,
     contradictionFlags: [],
+    pendingQuestion: null,
   };
 }
 
@@ -112,7 +150,7 @@ export function emptyIntakeState(): FounderIntakeState {
 // Step 2 — Coverage / completion check
 // ──────────────────────────────────────────────────────────────────────
 
-// Complete when ALL 3 MUST-fill fields have asked=true, regardless of
+// Complete when ALL MUST-fill fields have asked=true, regardless of
 // whether their values are populated or empty. A genuinely empty answer
 // is still a real answer — do not require non-empty values.
 export function checkCoverage(state: FounderIntakeState): CoverageResult {
@@ -136,6 +174,7 @@ export function recordFieldAsked(
   return {
     ...state,
     questionCount: state.questionCount + 1,
+    pendingQuestion: { fieldTarget: field, isFollowUp: false },
     fields: {
       ...state.fields,
       [field]: {
@@ -156,6 +195,7 @@ export function recordFollowUpAsked(
   return {
     ...state,
     questionCount: state.questionCount + 1,
+    pendingQuestion: { fieldTarget: field, isFollowUp: true },
     fields: {
       ...state.fields,
       [field]: {
@@ -179,6 +219,13 @@ export function recordFieldAnswer(
   const words = answerText.trim().split(/\s+/).filter((w) => w.length > 0);
   return {
     ...state,
+    // Clear pending pointer ONLY if the answer being recorded is for the
+    // currently-pending question. Guards against a stale pointer surviving
+    // (e.g. answer for a different field arrives out of order).
+    pendingQuestion:
+      state.pendingQuestion && state.pendingQuestion.fieldTarget === field
+        ? null
+        : state.pendingQuestion,
     fields: {
       ...state.fields,
       [field]: {
@@ -214,6 +261,7 @@ export function forceCompleteByCapTermination(
     ...state,
     fields: updatedFields,
     completedAt: state.completedAt ?? nowIso,
+    pendingQuestion: null,
   };
 }
 
@@ -222,7 +270,11 @@ export function markIntakeComplete(
   state: FounderIntakeState,
   now: Date = new Date()
 ): FounderIntakeState {
-  return { ...state, completedAt: state.completedAt ?? now.toISOString() };
+  return {
+    ...state,
+    completedAt: state.completedAt ?? now.toISOString(),
+    pendingQuestion: null,
+  };
 }
 
 // ──────────────────────────────────────────────────────────────────────
@@ -273,6 +325,23 @@ const CONTRADICTION_RULES: ContradictionRule[] = [
     message:
       "Capital availability was noted as externally funded; later answer indicates bootstrapped/self-funded — please clarify.",
   },
+  // Solo expertise claim + incoming teamSize answer describing a team.
+  // The existing solo+team rule already fires on team language in ANY
+  // incoming answer, so this rule specifically covers the numeric case
+  // where the founder writes "team of 5" without the trigger words
+  // ("my team"/"our team") — 8+ possible phrasings via the number itself.
+  {
+    existingField: "expertise",
+    existingMatch: /\bsolo(?:preneur)?\b|\bjust me\b|\bI'?m the only\b/i,
+    incomingField: "teamSize",
+    incomingMatch: /\bteam of \d+\b|\b(?:two|three|four|five|six|seven|eight|nine|ten|[2-9]|1[0-9])\s+(?:people|engineers?|folks|of us|full-timers?|employees?)\b/i,
+    message:
+      "Earlier answer indicates solo operation; teamSize answer describes multiple people — please clarify team composition.",
+  },
+  // No geography contradiction rule — no meaningful semantic pair.
+  // A founder stating "US-based" in geography does not contradict
+  // anything else on the profile; adding a rule here would be pure
+  // false-positive risk with no signal payoff.
 ];
 
 // Check a new answer for any field against the existing profile for
@@ -287,11 +356,16 @@ export function detectContradiction(
 ): ContradictionFlag | null {
   const now = new Date().toISOString();
 
-  // Compile existing field values to match against rules
+  // Compile existing field values to match against rules.
+  // teamSize is numeric — render as "team of N" so regex rules can match
+  // consistently. null stays "" so the rule can't fire on an absent value
+  // (same null-safety discipline as capitalAvailability).
   const profileText: Record<MustFillField, string> = {
     expertise: existingProfile.expertise.join(" "),
     distributionAssets: existingProfile.distributionAssets.join(" "),
     capitalAvailability: existingProfile.capitalAvailability ?? "",
+    teamSize: existingProfile.teamSize !== null ? `team of ${existingProfile.teamSize}` : "",
+    geography: existingProfile.geography ?? "",
   };
 
   for (const rule of CONTRADICTION_RULES) {

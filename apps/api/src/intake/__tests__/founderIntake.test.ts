@@ -22,16 +22,20 @@ const emptyProfile: FounderProfile = {
   expertise: [],
   distributionAssets: [],
   capitalAvailability: null,
+  teamSize: null,
+  geography: null,
 };
 
 function simulateTurns(
   turns: Array<{
-    field: "expertise" | "distributionAssets" | "capitalAvailability";
+    field: "expertise" | "distributionAssets" | "capitalAvailability" | "teamSize" | "geography";
     answerText: string;
     answerValues: {
       expertise?: string[];
       distributionAssets?: string[];
       capitalAvailability?: string | null;
+      teamSize?: number | null;
+      geography?: string | null;
     };
     isFollowUp?: boolean;
   }>
@@ -48,6 +52,8 @@ function simulateTurns(
     if (turn.answerValues.expertise !== undefined) profile = { ...profile, expertise: turn.answerValues.expertise };
     if (turn.answerValues.distributionAssets !== undefined) profile = { ...profile, distributionAssets: turn.answerValues.distributionAssets };
     if (turn.answerValues.capitalAvailability !== undefined) profile = { ...profile, capitalAvailability: turn.answerValues.capitalAvailability };
+    if (turn.answerValues.teamSize !== undefined) profile = { ...profile, teamSize: turn.answerValues.teamSize };
+    if (turn.answerValues.geography !== undefined) profile = { ...profile, geography: turn.answerValues.geography };
   }
   return { state, profile };
 }
@@ -55,36 +61,42 @@ function simulateTurns(
 // ── (1) Coverage / completion criteria ───────────────────────────────────────
 
 describe("(1) Coverage / completion criteria", () => {
-  it("fresh state → not complete, all 3 fields remaining", () => {
+  it("fresh state → not complete, all 5 fields remaining", () => {
     const fresh = emptyIntakeState();
     const cov = checkCoverage(fresh);
     expect(cov.complete).toBe(false);
     expect(
-      cov.remainingFields.length === 3 &&
+      cov.remainingFields.length === 5 &&
         cov.remainingFields.includes("expertise") &&
         cov.remainingFields.includes("distributionAssets") &&
-        cov.remainingFields.includes("capitalAvailability")
+        cov.remainingFields.includes("capitalAvailability") &&
+        cov.remainingFields.includes("teamSize") &&
+        cov.remainingFields.includes("geography")
     ).toBe(true);
   });
 
-  it("1/3 asked → not complete, correct 2 remaining fields", () => {
+  it("1/5 asked → not complete, correct 4 remaining fields", () => {
     let state = emptyIntakeState();
     state = recordFieldAsked(state, "expertise");
     const cov = checkCoverage(state);
     expect(cov.complete).toBe(false);
     expect(
-      cov.remainingFields.length === 2 &&
+      cov.remainingFields.length === 4 &&
         !cov.remainingFields.includes("expertise") &&
         cov.remainingFields.includes("distributionAssets") &&
-        cov.remainingFields.includes("capitalAvailability")
+        cov.remainingFields.includes("capitalAvailability") &&
+        cov.remainingFields.includes("teamSize") &&
+        cov.remainingFields.includes("geography")
     ).toBe(true);
   });
 
-  it("all 3 asked → complete, no remaining fields", () => {
+  it("all 5 asked → complete, no remaining fields", () => {
     let state = emptyIntakeState();
     state = recordFieldAsked(state, "expertise");
     state = recordFieldAsked(state, "distributionAssets");
     state = recordFieldAsked(state, "capitalAvailability");
+    state = recordFieldAsked(state, "teamSize");
+    state = recordFieldAsked(state, "geography");
     const cov = checkCoverage(state);
     expect(cov.complete).toBe(true);
     expect(cov.remainingFields.length).toBe(0);
@@ -97,6 +109,10 @@ describe("(1) Coverage / completion criteria", () => {
     state = recordFieldAsked(state, "distributionAssets");
     state = recordFieldAnswer(state, "distributionAssets", "");
     state = recordFieldAsked(state, "capitalAvailability");
+    state = recordFieldAsked(state, "teamSize");
+    state = recordFieldAnswer(state, "teamSize", "");
+    state = recordFieldAsked(state, "geography");
+    state = recordFieldAnswer(state, "geography", "");
     const cov = checkCoverage(state);
     expect(cov.complete).toBe(true);
   });
@@ -140,6 +156,8 @@ describe("(2) State-transition helpers", () => {
     expect(fixed.fields.distributionAssets.asked).toBe(true);
     expect(fixed.fields.distributionAssets.capTerminated).toBe(true);
     expect(fixed.fields.capitalAvailability.capTerminated).toBe(true);
+    expect(fixed.fields.teamSize.capTerminated).toBe(true);
+    expect(fixed.fields.geography.capTerminated).toBe(true);
     expect(fixed.completedAt).not.toBeNull();
   });
 
@@ -197,22 +215,28 @@ describe("(3) Sequencer — realistic traces", () => {
       expertise: ["Shopify app developer with 5 years experience in DTC"],
       distributionAssets: [],
       capitalAvailability: null,
+      teamSize: null,
+      geography: null,
     };
     const q = nextQuestion(state, profile);
     expect(q.done).toBe(false);
     expect(!q.done && q.nextQuestion === QUESTIONS.capitalAvailability.opener).toBe(true);
   });
 
-  it("trace E: all 3 fields asked → done by coverage, not cap", () => {
+  it("trace E: all 5 fields asked → done by coverage, not cap", () => {
     const { state } = simulateTurns([
       { field: "expertise", answerText: "Shopify developer 5 years", answerValues: { expertise: ["Shopify developer", "5 years SaaS"] } },
       { field: "distributionAssets", answerText: "Email list of 2000 subscribers", answerValues: { distributionAssets: ["Email list of 2000 subscribers"] } },
       { field: "capitalAvailability", answerText: "200K raised from angels", answerValues: { capitalAvailability: "$200K raised" } },
+      { field: "teamSize", answerText: "Three of us", answerValues: { teamSize: 3 } },
+      { field: "geography", answerText: "United States", answerValues: { geography: "United States" } },
     ]);
     const q = nextQuestion(state, {
       expertise: ["Shopify developer", "5 years SaaS"],
       distributionAssets: ["Email list of 2000 subscribers"],
       capitalAvailability: "$200K raised",
+      teamSize: 3,
+      geography: "United States",
     });
     expect(q.done).toBe(true);
     expect(q.done && !q.terminatedByCap).toBe(true);
@@ -228,6 +252,62 @@ describe("(3) Sequencer — realistic traces", () => {
     expect(q.done).toBe(false);
     expect(!q.done && q.fieldTarget === "distributionAssets").toBe(true);
     expect(!q.done && !q.isFollowUp).toBe(true);
+  });
+
+  it("trace G: expertise+dist+capital asked → teamSize is next", () => {
+    let state = emptyIntakeState();
+    state = recordFieldAsked(state, "expertise");
+    state = recordFieldAsked(state, "distributionAssets");
+    state = recordFieldAsked(state, "capitalAvailability");
+    const profile: FounderProfile = {
+      expertise: ["Shopify app developer with 5 years experience in DTC"],
+      distributionAssets: ["Newsletter with 3k subscribers"],
+      capitalAvailability: "bootstrapped",
+      teamSize: null,
+      geography: null,
+    };
+    const q = nextQuestion(state, profile);
+    expect(q.done).toBe(false);
+    expect(!q.done && q.fieldTarget === "teamSize").toBe(true);
+    expect(!q.done && q.nextQuestion === QUESTIONS.teamSize.opener).toBe(true);
+  });
+
+  it("trace H: first 4 asked → geography is next (last in the sequence)", () => {
+    let state = emptyIntakeState();
+    state = recordFieldAsked(state, "expertise");
+    state = recordFieldAsked(state, "distributionAssets");
+    state = recordFieldAsked(state, "capitalAvailability");
+    state = recordFieldAsked(state, "teamSize");
+    const profile: FounderProfile = {
+      expertise: ["Shopify app developer with 5 years experience in DTC"],
+      distributionAssets: [],
+      capitalAvailability: "bootstrapped",
+      teamSize: 1,
+      geography: null,
+    };
+    const q = nextQuestion(state, profile);
+    expect(q.done).toBe(false);
+    expect(!q.done && q.fieldTarget === "geography").toBe(true);
+  });
+
+  it("trace I: worst-case question count with all 5 MUST-fill + expertise follow-up = 6, still under cap of 15", () => {
+    let state = emptyIntakeState();
+    state = recordFieldAsked(state, "expertise");
+    state = recordFollowUpAsked(state, "expertise");
+    state = recordFieldAsked(state, "distributionAssets");
+    state = recordFieldAsked(state, "capitalAvailability");
+    state = recordFieldAsked(state, "teamSize");
+    state = recordFieldAsked(state, "geography");
+    expect(state.questionCount).toBe(6);
+    expect(state.questionCount < MAX_QUESTIONS).toBe(true);
+    const q = nextQuestion(state, {
+      expertise: ["irrelevant"],
+      distributionAssets: [],
+      capitalAvailability: null,
+      teamSize: null,
+      geography: null,
+    });
+    expect(q.done).toBe(true);
   });
 });
 
@@ -250,7 +330,12 @@ describe("(4) Cap termination", () => {
     const fixed = forceCompleteByCapTermination(state);
     const cov = checkCoverage(fixed);
     expect(cov.complete).toBe(true);
-    expect(fixed.fields.distributionAssets.capTerminated && fixed.fields.capitalAvailability.capTerminated).toBe(true);
+    expect(
+      fixed.fields.distributionAssets.capTerminated &&
+        fixed.fields.capitalAvailability.capTerminated &&
+        fixed.fields.teamSize.capTerminated &&
+        fixed.fields.geography.capTerminated
+    ).toBe(true);
     expect(fixed.fields.expertise.capTerminated).toBe(false);
   });
 
@@ -269,6 +354,8 @@ describe("(5) Contradiction detection", () => {
       expertise: ["solopreneur, built several SaaS tools myself"],
       distributionAssets: [],
       capitalAvailability: null,
+      teamSize: null,
+      geography: null,
     };
     const flag = detectContradiction(
       profile,
@@ -287,6 +374,8 @@ describe("(5) Contradiction detection", () => {
       expertise: ["Shopify developer"],
       distributionAssets: [],
       capitalAvailability: "bootstrapped with personal savings",
+      teamSize: null,
+      geography: null,
     };
     const flag = detectContradiction(
       profile,
@@ -306,6 +395,8 @@ describe("(5) Contradiction detection", () => {
       expertise: [],
       distributionAssets: [],
       capitalAvailability: "raised $1.2M Series A",
+      teamSize: null,
+      geography: null,
     };
     const flag = detectContradiction(profile, "capitalAvailability", "I'm fully bootstrapped with no outside capital");
     expect(flag).not.toBeNull();
@@ -316,6 +407,8 @@ describe("(5) Contradiction detection", () => {
       expertise: ["Shopify app developer for 6 years"],
       distributionAssets: [],
       capitalAvailability: null,
+      teamSize: null,
+      geography: null,
     };
     const flag = detectContradiction(
       profile,
@@ -330,12 +423,43 @@ describe("(5) Contradiction detection", () => {
     expect(flag).toBeNull();
   });
 
+  it("solo expertise + incoming teamSize answer describing a team → flag detected", () => {
+    const profile: FounderProfile = {
+      ...emptyProfile,
+      expertise: ["solopreneur — built everything myself"],
+    };
+    const flag = detectContradiction(profile, "teamSize", "It's a team of 5 including me");
+    expect(flag).not.toBeNull();
+    expect(flag?.field1).toBe("expertise");
+    expect(flag?.field2).toBe("teamSize");
+  });
+
+  it("solo expertise + teamSize answer '1' → no flag (consistent)", () => {
+    const profile: FounderProfile = {
+      ...emptyProfile,
+      expertise: ["solopreneur"],
+    };
+    const flag = detectContradiction(profile, "teamSize", "1");
+    expect(flag).toBeNull();
+  });
+
+  it("geography answer alone → no flag (no rule targets geography)", () => {
+    const profile: FounderProfile = {
+      ...emptyProfile,
+      expertise: ["solopreneur"],
+    };
+    const flag = detectContradiction(profile, "geography", "United States");
+    expect(flag).toBeNull();
+  });
+
   it("addContradictionFlag + resolveContradictionFlag: detected, stored, marked resolved without removal", () => {
     let state = emptyIntakeState();
     const profile: FounderProfile = {
       expertise: ["solopreneur"],
       distributionAssets: [],
       capitalAvailability: null,
+      teamSize: null,
+      geography: null,
     };
     const flag = detectContradiction(profile, "distributionAssets", "my team runs our outbound campaigns");
     expect(flag).not.toBeNull();

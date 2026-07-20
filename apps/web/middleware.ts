@@ -2,7 +2,9 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 // Paths that do not require a session. Everything else is protected by default.
-const PUBLIC_PATHS = new Set(["/login", "/auth/callback"]);
+// "/" is the public marketing landing page — separate from the authenticated
+// dashboard, which lives at "/dashboard".
+const PUBLIC_PATHS = new Set(["/", "/login", "/auth/callback"]);
 
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
@@ -42,7 +44,7 @@ export async function middleware(request: NextRequest) {
 
   if (user && pathname === "/login") {
     const url = request.nextUrl.clone();
-    url.pathname = "/";
+    url.pathname = "/dashboard";
     const res = NextResponse.redirect(url);
     supabaseResponse.cookies.getAll().forEach((c) => res.cookies.set(c));
     return res;

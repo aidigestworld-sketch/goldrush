@@ -6,16 +6,21 @@
 //
 // BRANCHING DESIGN
 // ────────────────
-// Primary sequence: expertise → distributionAssets → capitalAvailability
+// Primary sequence:
+//   expertise → distributionAssets → capitalAvailability → teamSize → geography
 // This ordering reflects relative signal weight for FounderFit:
 //   1. expertise — most differentiated, drives matched_strength and gap
 //      scoring most directly; ask first so subsequent questions can
 //      reference it ("given your [X] background, do you have any…")
 //   2. distributionAssets — the second source_field FounderFit can cite;
 //      asking before capital lets us frame distribution gaps accurately
-//   3. capitalAvailability — comes last because it's the field most
-//      founders are sensitive about; warm them up with non-financial
-//      questions first
+//   3. capitalAvailability — sensitive question; warm founders up with
+//      non-financial questions first
+//   4. teamSize — after capital because capital answer often already
+//      reveals whether the founder is solo/team-backed
+//   5. geography — asked last; least sensitive, cheapest to answer,
+//      pads the tail so a founder abandoning mid-flow still gets the
+//      four higher-signal fields
 //
 // Follow-up rule for expertise (only field with a follow-up):
 //   If expertise was asked but the answer looks generic/shallow
@@ -26,9 +31,14 @@
 //   The follow-up is only ever issued once per session (followUpAsked
 //   guards against repetition).
 //
-// Hard cap: MAX_QUESTIONS (15). On hitting the cap, the sequencer
-// returns `done: true, terminatedByCap: true`. The caller must then
-// run forceCompleteByCapTermination() from founderIntakeState.ts to
+// Hard cap: MAX_QUESTIONS (15). Kept at 15 despite the MUST-fill set
+// growing 3→5: worst case is now 5 MUST-fill + 1 expertise follow-up
+// = 6 questions, still comfortably below the cap. Raising the cap
+// would silently trade completion rate for more depth without a
+// signal we're leaving on the table — don't do it without evidence.
+// On hitting the cap, the sequencer returns `done: true,
+// terminatedByCap: true`. The caller must then run
+// forceCompleteByCapTermination() from founderIntakeState.ts to
 // mark unasked fields and store the state.
 //
 // SIDE-EFFECT CONTRACT:
@@ -64,6 +74,14 @@ export const QUESTIONS = {
   capitalAvailability: {
     opener:
       "What's your current capital situation — are you bootstrapping with personal savings, have you raised external funding, or is that still being figured out?",
+  },
+  teamSize: {
+    opener:
+      "Who is working on this with you? Are you solo, or do you have co-founders / employees / regular contractors? A rough head count is fine.",
+  },
+  geography: {
+    opener:
+      "Where are you and your team based? A country or region is enough — this helps size which markets you can realistically operate in.",
   },
 } as const;
 
@@ -135,6 +153,8 @@ export function nextQuestion(
   const exp = state.fields.expertise;
   const dist = state.fields.distributionAssets;
   const cap = state.fields.capitalAvailability;
+  const team = state.fields.teamSize;
+  const geo = state.fields.geography;
 
   // 1. Expertise opener — always first
   if (!exp.asked) {
@@ -179,6 +199,26 @@ export function nextQuestion(
       done: false,
       nextQuestion: QUESTIONS.capitalAvailability.opener,
       fieldTarget: "capitalAvailability",
+      isFollowUp: false,
+    };
+  }
+
+  // 5. Team size
+  if (!team.asked) {
+    return {
+      done: false,
+      nextQuestion: QUESTIONS.teamSize.opener,
+      fieldTarget: "teamSize",
+      isFollowUp: false,
+    };
+  }
+
+  // 6. Geography
+  if (!geo.asked) {
+    return {
+      done: false,
+      nextQuestion: QUESTIONS.geography.opener,
+      fieldTarget: "geography",
       isFollowUp: false,
     };
   }
