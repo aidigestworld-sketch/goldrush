@@ -10,6 +10,7 @@
 
 import { startServer } from "../api/server";
 import { prisma } from "../db/client";
+import { enqueueStep } from "../orchestrator/sequencing";
 
 const VERTICAL = "b2b_customer_support_saas";
 // Stable tracking key — stored as hypothesis_id in dag_run_state.
@@ -17,42 +18,141 @@ const VERTICAL = "b2b_customer_support_saas";
 const B2B_TRACKING_KEY = "b2b00000-0000-0000-0000-000000000001";
 const POLL_INTERVAL_MS = 8_000;
 const TIMEOUT_MS = 30 * 60 * 1_000; // 30 min hard stop
+// Per-step ceiling. Legit worst case ≈ 15-min NIM attempt + 5s BullMQ
+// backoff + partial second attempt. 20 min sits above that but well
+// under the whole-run cap so a truly-wedged step is caught within
+// ~10 min of hanging past its normal 2–9 min window.
+const STEP_TIMEOUT_MS = 20 * 60 * 1_000;
+// Cap on how long the shutdown path itself will wait. BullMQ's
+// Worker.close() waits for in-flight jobs to drain (which can hang if
+// a job is stuck in a slow NIM call); prisma.$disconnect() can also
+// hang. Wrap both in a timeout so the process exits promptly.
+const SHUTDOWN_TIMEOUT_MS = 15_000;
 
-async function poll(base: string, trackingKey: string): Promise<void> {
-  const statusUrl = `${base}/hypotheses/${trackingKey}/status`;
+function ts(): string {
+  return new Date().toISOString();
+}
+
+async function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T | undefined> {
+  return await Promise.race([
+    p,
+    new Promise<undefined>((resolve) =>
+      setTimeout(() => {
+        console.warn(`[${ts()}] [b2b] ${label} exceeded ${ms}ms — proceeding without waiting`);
+        resolve(undefined);
+      }, ms)
+    ),
+  ]);
+}
+
+// Polls dag_run_state directly rather than hitting GET /hypotheses/:id/status,
+// which lives behind the auth middleware and would need a Supabase JWT the
+// script can't produce. All the info the endpoint returns is derivable from
+// dag_run_state + pipeline_run — this is what the endpoint reads anyway.
+async function poll(runId: string): Promise<void> {
   const deadline = Date.now() + TIMEOUT_MS;
-  let dots = 0;
+  let tick = 0;
+
+  // Per-step observed state for transition + retry detection between polls.
+  // Keyed by step name.
+  type StepSnapshot = { status: string; attemptCount: number; startedAt: Date | null };
+  const seen = new Map<string, StepSnapshot>();
 
   while (Date.now() < deadline) {
     await sleep(POLL_INTERVAL_MS);
-    const res = await fetch(statusUrl);
-    if (!res.ok) {
-      console.warn(`  [poll] status ${res.status}: ${await res.text()}`);
-      continue;
-    }
-    const body = (await res.json()) as {
-      overall: string;
-      steps: { step: string; status: string; lastError?: string | null }[];
-    };
+    tick++;
+    const [rows, run] = await Promise.all([
+      prisma.dagRunState.findMany({ where: { runId } }),
+      prisma.pipelineRun.findUnique({ where: { runId } }),
+    ]);
 
-    // Print running step(s)
-    const running = body.steps.filter((s) => s.status === "running").map((s) => s.step);
-    const failed = body.steps.filter((s) => s.status === "failed_permanent");
-    process.stdout.write(`\r  [${++dots}] overall=${body.overall}  running=[${running.join(",")}]   `);
+    // ── Step transition + retry detection ─────────────────────────────
+    for (const r of rows) {
+      const prev = seen.get(r.step);
+      if (!prev) {
+        // First time we've seen this step row.
+        if (r.status === "running") {
+          console.log(`[${ts()}] STEP START   step=${r.step}  attempt=${r.attemptCount + 1}`);
+        } else if (r.status === "succeeded" || r.status === "failed_permanent") {
+          console.log(`[${ts()}] STEP ${r.status.toUpperCase()}   step=${r.step}  (observed already-terminal)`);
+        }
+      } else {
+        if (prev.status !== "running" && r.status === "running") {
+          console.log(`[${ts()}] STEP START   step=${r.step}  attempt=${r.attemptCount + 1}`);
+        }
+        if (prev.status === "running" && r.status === "succeeded") {
+          const durMs = r.startedAt ? Date.now() - r.startedAt.getTime() : null;
+          console.log(
+            `[${ts()}] STEP OK      step=${r.step}  duration=${durMs !== null ? Math.round(durMs / 1000) + "s" : "n/a"}  attempts=${r.attemptCount}`
+          );
+        }
+        if (prev.status === "running" && r.status === "failed_permanent") {
+          const durMs = r.startedAt ? Date.now() - r.startedAt.getTime() : null;
+          console.error(
+            `[${ts()}] STEP FAIL    step=${r.step}  duration=${durMs !== null ? Math.round(durMs / 1000) + "s" : "n/a"}  attempts=${r.attemptCount}  err=${(r.lastError ?? "").slice(0, 200)}`
+          );
+        }
+        // attemptCount growth while still running/pending = a retry event.
+        // NIM 504s trigger BullMQ retry — this is where we see it from
+        // outside the worker.
+        if (r.attemptCount > prev.attemptCount && r.status !== "succeeded") {
+          console.warn(
+            `[${ts()}] RETRY        step=${r.step}  attempt=${r.attemptCount}  (prev err: ${(r.lastError ?? "").slice(0, 120)})`
+          );
+        }
+      }
+      seen.set(r.step, {
+        status: r.status,
+        attemptCount: r.attemptCount,
+        startedAt: r.startedAt,
+      });
+    }
+
+    const running = rows.filter((r) => r.status === "running");
+    const failed = rows.filter((r) => r.status === "failed_permanent");
+    const succeeded = rows.filter((r) => r.status === "succeeded").length;
+    const joinRow = rows.find((r) => r.step === "compression");
+
+    // Ticker on its own line with a wall-clock timestamp — a frozen
+    // ticker is visually obvious (same "tick=" value with an old
+    // timestamp) vs. one that's polling but seeing no progress
+    // (increasing tick + fresh timestamp + same running set).
+    console.log(
+      `[${ts()}] TICK ${tick}  succeeded=${succeeded}/${rows.length}  running=[${running.map((r) => r.step).join(",")}]  pr_status=${run?.status ?? "?"}`
+    );
+
+    // Per-step timeout: any step that's been in `running` longer than
+    // STEP_TIMEOUT_MS is treated as wedged. Mark it failed_permanent so
+    // downstream state is coherent and abort the poll.
+    for (const r of running) {
+      if (!r.startedAt) continue;
+      const elapsedMs = Date.now() - r.startedAt.getTime();
+      if (elapsedMs > STEP_TIMEOUT_MS) {
+        const msg = `STEP TIMEOUT: ${r.step} exceeded ${Math.round(STEP_TIMEOUT_MS / 1000)}s (actual ${Math.round(elapsedMs / 1000)}s)`;
+        console.error(`[${ts()}] ${msg}`);
+        await prisma.dagRunState.update({
+          where: { id: r.id },
+          data: { status: "failed_permanent", lastError: msg, completedAt: new Date() },
+        });
+        console.error(`[${ts()}] Marked step=${r.step} failed_permanent in dag_run_state. Halting poll.`);
+        return;
+      }
+    }
 
     if (failed.length > 0) {
-      console.log();
-      for (const f of failed) console.error(`  FAILED step=${f.step}  error=${f.lastError ?? ""}`);
-      console.log("\n  Run halted — partial results shown below.");
+      for (const f of failed) console.error(`[${ts()}] FAILED step=${f.step}  error=${(f.lastError ?? "").slice(0, 200)}`);
+      console.log(`[${ts()}] Run halted — partial results shown below.`);
       return;
     }
-    if (body.overall === "completed") {
-      console.log("\n  All steps succeeded.");
+    // Terminal: compression succeeded (whether it produced an Opportunity or
+    // wrote insufficient_evidence — both are legitimate end states).
+    if (joinRow?.status === "succeeded") {
+      console.log(`[${ts()}] Compression completed  pipeline_run.status=${run?.status}`);
       return;
     }
   }
 
-  console.log("\n  TIMEOUT: run did not complete within 30 minutes.");
+  console.error(`[${ts()}] WHOLE-RUN TIMEOUT: run did not complete within ${Math.round(TIMEOUT_MS / 60_000)} minutes.`);
 }
 
 function sleep(ms: number) {
@@ -191,45 +291,55 @@ async function main() {
   // Force fresh run by clearing prior state
   await resetPriorRuns();
 
-  // Start server + workers
+  // Start server + workers (workers are what actually drain the BullMQ
+  // queues we enqueue below — the HTTP server itself isn't strictly
+  // needed by this script anymore, but startServer starts both).
   const server = await startServer();
-  const base = `http://localhost:${server.port}`;
-  console.log(`[b2b] server started at ${base}`);
+  console.log(`[b2b] server + workers started on port ${server.port}`);
 
   process.on("SIGINT", async () => {
-    await server.stop();
-    await prisma.$disconnect();
+    console.log(`\n[${ts()}] SIGINT received — shutting down (timeout-guarded)`);
+    await withTimeout(server.stop(), SHUTDOWN_TIMEOUT_MS, "server.stop");
+    await withTimeout(prisma.$disconnect(), SHUTDOWN_TIMEOUT_MS, "prisma.$disconnect");
     process.exit(0);
   });
 
-  // Fire the orchestrate endpoint
-  console.log(`[b2b] POST ${base}/hypotheses/${B2B_TRACKING_KEY}/orchestrate`);
-  const orchRes = await fetch(`${base}/hypotheses/${B2B_TRACKING_KEY}/orchestrate`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ founderId: founder.id, vertical: VERTICAL }),
+  // Kick off the run in-process. The /hypotheses/:id/orchestrate endpoint
+  // requires a Supabase JWT (auth middleware — see middleware/auth.ts);
+  // scripts can't produce one, so we replicate what the endpoint does
+  // (create pipeline_run for this founder+vertical, enqueue the first
+  // DAG step) directly against prisma + sequencing. resetPriorRuns above
+  // guarantees this is always a fresh run.
+  const pipelineRun = await prisma.pipelineRun.create({
+    data: { founderId: founder.id, vertical: VERTICAL },
   });
-  if (!orchRes.ok) throw new Error(`orchestrate failed: ${orchRes.status} ${await orchRes.text()}`);
-  const orchBody = await orchRes.json() as { runId: string; isNewRun: boolean; resumedFrom: string };
-  console.log(`[b2b] runId=${orchBody.runId}  isNewRun=${orchBody.isNewRun}  resumedFrom=${orchBody.resumedFrom}`);
+  const runId = pipelineRun.runId;
+  console.log(`[b2b] created pipeline_run runId=${runId}  vertical=${VERTICAL}`);
+  await enqueueStep("discovery", { runId, hypothesisId: B2B_TRACKING_KEY });
+  console.log(`[b2b] enqueued discovery step`);
 
   // Pre-seed the "Customer Support Software" market so expansion always has
   // a customer-support-tagged market to work against, regardless of what
   // discovery produces.
-  await ensureCustomerSupportMarket(orchBody.runId);
+  await ensureCustomerSupportMarket(runId);
 
-  // Poll to completion
-  await poll(base, B2B_TRACKING_KEY);
+  // Poll to completion (directly against dag_run_state to avoid auth).
+  await poll(runId);
 
   // Report
-  await report(orchBody.runId);
+  await report(runId);
 
-  await server.stop();
-  await prisma.$disconnect();
+  console.log(`[${ts()}] Shutting down (timeout-guarded)`);
+  await withTimeout(server.stop(), SHUTDOWN_TIMEOUT_MS, "server.stop");
+  await withTimeout(prisma.$disconnect(), SHUTDOWN_TIMEOUT_MS, "prisma.$disconnect");
+  // Force-exit — if a BullMQ worker or Redis handle is still holding
+  // the event loop open past the shutdown window, we prefer a clean
+  // exit code over hanging.
+  process.exit(0);
 }
 
 main().catch(async (e) => {
   console.error(e);
-  await prisma.$disconnect();
+  await withTimeout(prisma.$disconnect(), SHUTDOWN_TIMEOUT_MS, "prisma.$disconnect");
   process.exit(1);
 });

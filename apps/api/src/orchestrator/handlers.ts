@@ -197,6 +197,17 @@ export const handlers: Record<DagStep, (data: JobData) => Promise<HandlerResult>
       }
       const llm = await makeNimLlmForAgent("CompetitiveAnalysis");
       const result = await runCompetitiveAnalysisAgent(data.runId, problemId, map, llm);
+      // Same pattern as discovery/expansion above: bounded-rule
+      // violations from a single mid-tier LLM call are often transient
+      // (evidence_ref wrapper leakage, off-by-quote grounding misses,
+      // etc.) — throw so BullMQ retries with the same corpus.
+      // Persistent BRVs across all 3 queue attempts still land in
+      // failed_permanent via evaluateWorkerFailure, preserving the
+      // same ceiling.
+      const brvCount = (result as { boundedRuleViolations?: string[] }).boundedRuleViolations?.length ?? 0;
+      if (brvCount > 0) {
+        throw new Error(`competitive_analysis had ${brvCount} bounded-rule violation(s) — retrying`);
+      }
       return { extra: { ...result } };
     }),
 

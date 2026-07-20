@@ -43,6 +43,7 @@
 // with a smarter prompt here.
 import { z } from "zod";
 import type { LLMClient } from "./llmClient";
+import { parseLlmJson } from "./parseLlmJson";
 
 export interface CompetitiveAnalysisInputDocument {
   id: string;
@@ -100,6 +101,11 @@ business_models is different from existing_solutions: model_type and model_type_
 
 Also distinguish: is a claim about a competitor coming from the competitor's OWN material, or from a third party's commentary about them? Set positioning_summary_is_competitor_stated to false if the quote is analyst/third-party opinion rather than the competitor's own words — do not present a third party's characterization as if it were the competitor's self-description.
 
+evidence_refs format — MUST be the bare document id ONLY: exactly the UUID string that appears inside id="..." on each [document ...] tag. Do NOT prefix with "document ", "doc ", "id:", or any other wrapper; do NOT wrap in brackets or quotes-within-strings; do NOT re-emit the whole [document ...] tag. Only the raw UUID.
+Correct:   "evidence_refs": ["3877e3f3-fcd9-43df-9f40-1bc69b7e42ec"]
+Incorrect: "evidence_refs": ["document 3877e3f3-fcd9-43df-9f40-1bc69b7e42ec"]
+Incorrect: "evidence_refs": ["[document id=\"3877e3f3-...\"]"]
+
 Do not rank competitors or recommend anything. Structure only.
 
 Respond with ONLY valid JSON matching this exact shape. Your response MUST begin with { and end with }. Do not include any explanation, preamble, commentary, or markdown formatting before or after the JSON object — not even a single word:
@@ -114,7 +120,7 @@ Respond with ONLY valid JSON matching this exact shape. Your response MUST begin
     "strengths": string[],
     "weaknesses": string[],
     "estimated_market_share": number | null,
-    "evidence_refs": string[]
+    "evidence_refs": string[]  // bare document ids from the input (no "document " prefix), non-empty
   }],
   "business_models": [{
     // ONLY include an entry here if a real category can be named from
@@ -123,7 +129,7 @@ Respond with ONLY valid JSON matching this exact shape. Your response MUST begin
     "competitor_label": string,
     "model_type": string,
     "model_type_quote": string,
-    "evidence_refs": string[]
+    "evidence_refs": string[]  // bare document ids from the input (no "document " prefix), non-empty
   }]
 }`;
 
@@ -153,15 +159,6 @@ function normalize(s: string): string {
   return s.replace(/\s+/g, " ").trim().toLowerCase();
 }
 
-// Extract the JSON object from a raw model response, tolerating prose
-// preamble or markdown fences (e.g. "Here is the analysis:\n{...}").
-function extractAndClean(raw: string): string {
-  const first = raw.indexOf("{");
-  const last = raw.lastIndexOf("}");
-  if (first !== -1 && last > first) return raw.slice(first, last + 1);
-  return raw.trim().replace(/^```json\s*/i, "").replace(/```\s*$/, "");
-}
-
 export async function runCompetitiveAnalysisSandbox(
   llm: LLMClient,
   documents: CompetitiveAnalysisInputDocument[]
@@ -174,48 +171,109 @@ export async function runCompetitiveAnalysisSandbox(
   const boundedRuleViolations: string[] = [];
   const sourceAttributionWarnings: string[] = [];
 
-  try {
-    const cleaned = extractAndClean(rawResponse);
-    const json = JSON.parse(cleaned);
-    const result = CompetitiveAnalysisOutputSchema.safeParse(json);
+  const parseResult = parseLlmJson(rawResponse);
+  if (parseResult.error) {
+    validationErrors.push(parseResult.error);
+  } else {
+    const result = CompetitiveAnalysisOutputSchema.safeParse(parseResult.data);
     if (!result.success) {
       validationErrors.push(result.error.toString());
     } else {
       parsed = result.data;
       const docsById = new Map(documents.map((d) => [d.id, d.text]));
 
+      // Defensive normalization for a class of LLM output where the
+      // prompt's `[document id="<uuid>"]` wrapper leaks into the
+      // response as `"document <uuid>"`. Prompt has been tightened to
+      // instruct bare ids only (see SYSTEM_PROMPT above), but a mid-tier
+      // model occasionally still echoes the wrapper — strip a leading
+      // "document " (case-insensitive, whitespace-tolerant). Any other
+      // malformed form (e.g. wrong UUID) still fails the has() check.
+      //
+      // Applied in-place on `parsed` so downstream (agent write-path in
+      // competitiveAnalysisAgent.ts:145, 164) receives already-clean ids
+      // — otherwise a "document <uuid>" would slip through validation
+      // here and then FK-fail at nodeSourceRefRepository.createMany.
+      const normalizeRef = (r: string): string => r.trim().replace(/^document\s+/i, "");
+      for (const s of parsed.existing_solutions) {
+        s.evidence_refs = s.evidence_refs.map(normalizeRef);
+      }
+      for (const bm of parsed.business_models) {
+        bm.evidence_refs = bm.evidence_refs.map(normalizeRef);
+      }
+
       const checkRefs = (label: string, refs: string[]) => {
         const bad = refs.filter((r) => !docsById.has(r));
         if (bad.length > 0) boundedRuleViolations.push(`"${label}" cites nonexistent evidence_refs: ${bad.join(", ")}`);
       };
-      const checkGrounding = (label: string, quote: string | null, refs: string[], field: string) => {
-        if (!quote) return;
+      const isGrounded = (quote: string, refs: string[]): boolean => {
         const normalizedQuote = normalize(quote);
-        const groundedInAny = refs.some((r) => docsById.get(r) && normalize(docsById.get(r)!).includes(normalizedQuote));
-        if (!groundedInAny) {
-          boundedRuleViolations.push(
-            `"${label}"'s ${field} quote "${quote}" is not an actual substring of any cited document — category-stereotype inference, not real extraction`
-          );
+        return refs.some((r) => docsById.get(r) && normalize(docsById.get(r)!).includes(normalizedQuote));
+      };
+
+      // Strip-and-continue for positioning_summary / pricing_summary — both
+      // are OPTIONAL fields (schema allows null summary + null quote).
+      // Mirrors expansionSandbox.ts:270-291's stripIfUngrounded rationale:
+      // "LLMs that paraphrase rather than verbatim-copy will never recover
+      // on retry, so stripping is better." Live-verified against
+      // nvidia-nemotron-nano-9b-v2 on 2026-07-20: model consistently
+      // paraphrases pricing quotes ("Plans run from $10/mo..." vs source's
+      // "Starter | $10 USD | 50 | 3" table format) — retrying just wastes
+      // NIM calls. We keep the solution row (label + strengths + weaknesses
+      // still land), just null the fields that couldn't be verbatim-grounded.
+      //
+      // Preserves grounding discipline: an ungrounded quote never lands in
+      // the DB as if it were extraction. It becomes null with a warning
+      // logged for observability, same treatment Expansion applies.
+      const stripUngroundedSummary = (
+        label: string,
+        s: { positioning_summary: string | null; positioning_summary_quote: string | null; pricing_summary: string | null; pricing_summary_quote: string | null },
+        refs: string[]
+      ) => {
+        if (s.positioning_summary_quote && !isGrounded(s.positioning_summary_quote, refs)) {
+          console.warn(`[competitiveAnalysisSandbox] fabricated_grounding_stripped field=positioning_summary solution="${label}"`);
+          s.positioning_summary = null;
+          s.positioning_summary_quote = null;
+        }
+        if (s.pricing_summary_quote && !isGrounded(s.pricing_summary_quote, refs)) {
+          console.warn(`[competitiveAnalysisSandbox] fabricated_grounding_stripped field=pricing_summary solution="${label}"`);
+          s.pricing_summary = null;
+          s.pricing_summary_quote = null;
         }
       };
 
       for (const s of parsed.existing_solutions) {
         checkRefs(s.label, s.evidence_refs);
-        checkGrounding(s.label, s.positioning_summary_quote, s.evidence_refs, "positioning_summary");
-        checkGrounding(s.label, s.pricing_summary_quote, s.evidence_refs, "pricing_summary");
+        stripUngroundedSummary(s.label, s, s.evidence_refs);
         if (s.positioning_summary !== null && !s.positioning_summary_is_competitor_stated) {
           sourceAttributionWarnings.push(
             `"${s.label}": positioning_summary is flagged as third-party commentary, not competitor-stated — confirm this isn't being presented as the competitor's own position downstream`
           );
         }
       }
-      for (const bm of parsed.business_models) {
+
+      // business_models: model_type_quote is REQUIRED by the schema (line 79
+      // comment: "the field most prone to category-stereotype inference"),
+      // so we can't null it like the summary fields. Instead, DROP the
+      // whole business_model entry when its quote doesn't ground — same
+      // spirit as Expansion's stripping (don't let ungrounded content into
+      // the DB, but don't block the whole run either). Nonexistent-ref BRVs
+      // still fire loud (that's real hallucination, not paraphrasing).
+      const droppedBmLabels: string[] = [];
+      parsed.business_models = parsed.business_models.filter((bm) => {
         checkRefs(bm.competitor_label, bm.evidence_refs);
-        checkGrounding(bm.competitor_label, bm.model_type_quote, bm.evidence_refs, "model_type");
+        if (!isGrounded(bm.model_type_quote, bm.evidence_refs)) {
+          droppedBmLabels.push(bm.competitor_label);
+          return false;
+        }
+        return true;
+      });
+      if (droppedBmLabels.length > 0) {
+        console.warn(
+          `[competitiveAnalysisSandbox] fabricated_grounding_stripped field=model_type_quote dropped_business_models=[${droppedBmLabels.join(", ")}]`
+        );
       }
     }
-  } catch (err) {
-    validationErrors.push(`JSON parse failed: ${(err as Error).message}`);
   }
 
   return { rawResponse, parsed, validationErrors, boundedRuleViolations, sourceAttributionWarnings };

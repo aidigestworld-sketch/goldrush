@@ -113,9 +113,138 @@ describe("competitiveAnalysisSandbox", () => {
     expect(result.boundedRuleViolations.length).toBe(0);
   });
 
-  it("stereotype response: parses but invented free-trial claim caught as category-stereotype violation", async () => {
+  it("stereotype response: positioning_summary invented free-trial claim gets stripped (nulled) rather than raising BRV — mirrors Expansion's stripIfUngrounded pattern; pricing_summary grounds and stays", async () => {
     const stereotype = await runCompetitiveAnalysisSandbox(new StereotypeMockLLM(), competitiveAnalysisInputDocs);
     expect(stereotype.parsed).not.toBeNull();
-    expect(stereotype.boundedRuleViolations.some((v) => v.includes("14-day free trial") && v.includes("category-stereotype"))).toBe(true);
+    // No grounding BRV — paraphrased quote is silently nulled, not raised.
+    // (Retrying wouldn't help; same LLM would paraphrase again.)
+    expect(stereotype.boundedRuleViolations.some((v) => v.includes("14-day free trial"))).toBe(false);
+    // Solution row still lands (label + strengths still useful downstream),
+    // just with positioning stripped to null.
+    const sol = stereotype.parsed?.existing_solutions[0];
+    expect(sol?.label).toBe("Recharge");
+    expect(sol?.positioning_summary).toBeNull();
+    expect(sol?.positioning_summary_quote).toBeNull();
+    // pricing_summary grounds in doc-301, stays intact.
+    expect(sol?.pricing_summary).toContain("1.0-1.49%");
+    expect(sol?.pricing_summary_quote).toContain("1.0-1.49%");
+  });
+
+  it("paraphrased pricing quote (live b2b run 2026-07-20 regression): ungrounded pricing_summary_quote is stripped, solution row still lands", async () => {
+    class ParaphrasedPricingMockLLM implements LLMClient {
+      async complete(): Promise<string> {
+        return JSON.stringify({
+          existing_solutions: [
+            {
+              label: "Recharge",
+              positioning_summary: "Built for growing and enterprise subscription brands.",
+              positioning_summary_quote: "built for growing and enterprise subscription brands",
+              positioning_summary_is_competitor_stated: true,
+              // Paraphrased — actual doc has "1.0-1.49% and $0.19 per order"
+              pricing_summary: "Plans run from $25 to $499+ per month, plus fees",
+              pricing_summary_quote: "Plans range from $25/mo to $499+/mo, with transaction fees on top",
+              strengths: ["dunning and payment-recovery tooling included at every tier"],
+              weaknesses: [],
+              estimated_market_share: null,
+              evidence_refs: ["doc-301"],
+            },
+          ],
+          business_models: [
+            // Also paraphrased — dropped entirely (model_type_quote required).
+            {
+              competitor_label: "Recharge",
+              model_type: "tiered subscription plus per-order fee",
+              model_type_quote: "Recharge charges tiered subscriptions plus per-order fees",
+              evidence_refs: ["doc-301"],
+            },
+          ],
+        });
+      }
+    }
+    const result = await runCompetitiveAnalysisSandbox(new ParaphrasedPricingMockLLM(), competitiveAnalysisInputDocs);
+    expect(result.parsed).not.toBeNull();
+    expect(result.boundedRuleViolations).toEqual([]);
+    // Solution row kept, positioning stays (grounds), pricing stripped.
+    expect(result.parsed?.existing_solutions.length).toBe(1);
+    expect(result.parsed?.existing_solutions[0].positioning_summary).not.toBeNull();
+    expect(result.parsed?.existing_solutions[0].pricing_summary).toBeNull();
+    expect(result.parsed?.existing_solutions[0].pricing_summary_quote).toBeNull();
+    // Business model with ungrounded model_type_quote dropped entirely
+    // (can't null a required field; matches the same "don't let ungrounded
+    // content land in DB" spirit).
+    expect(result.parsed?.business_models.length).toBe(0);
+  });
+
+  // Regression: a live b2b_customer_support_saas run (2026-07-20) had CA's
+  // LLM emit evidence_refs as "document <uuid>" — echoing the prompt's
+  // `[document id="<uuid>"]` wrapper. checkRefs's exact-match failed
+  // every ref, flagged every solution BRV, cascade zeroed out silently.
+  // Sandbox now strips a leading "document " and rewrites parsed refs
+  // in-place so downstream nodeSourceRefRepository.createMany also
+  // receives clean ids.
+  it("document-prefix response: 'document <valid-id>' refs are stripped, resolve to docs, no BRV, parsed refs are normalized in place", async () => {
+    class DocumentPrefixMockLLM implements LLMClient {
+      async complete(): Promise<string> {
+        return JSON.stringify({
+          existing_solutions: [
+            {
+              label: "Recharge",
+              positioning_summary: "Built for growing and enterprise subscription brands.",
+              positioning_summary_quote: "built for growing and enterprise subscription brands",
+              positioning_summary_is_competitor_stated: true,
+              pricing_summary: null,
+              pricing_summary_quote: null,
+              strengths: [],
+              weaknesses: [],
+              estimated_market_share: null,
+              evidence_refs: ["document doc-301"],
+            },
+          ],
+          business_models: [
+            {
+              competitor_label: "Recharge",
+              model_type: "tiered_subscription_plus_percent_plus_per_order",
+              model_type_quote: "1.0-1.49% and $0.19 per order",
+              evidence_refs: ["Document  doc-301"], // capitalization + extra whitespace on purpose
+            },
+          ],
+        });
+      }
+    }
+    const result = await runCompetitiveAnalysisSandbox(new DocumentPrefixMockLLM(), competitiveAnalysisInputDocs);
+    expect(result.parsed).not.toBeNull();
+    expect(result.boundedRuleViolations).toEqual([]);
+    // Parsed refs are rewritten to bare ids so downstream write-path
+    // receives already-clean values (no "document " prefix leaks into
+    // node_source_refs.evidence_id).
+    expect(result.parsed?.existing_solutions[0].evidence_refs).toEqual(["doc-301"]);
+    expect(result.parsed?.business_models[0].evidence_refs).toEqual(["doc-301"]);
+  });
+
+  it("document-prefix response: a genuinely-nonexistent id STILL fails after prefix strip (not accepting anything malformed)", async () => {
+    class DocumentPrefixFakeIdMockLLM implements LLMClient {
+      async complete(): Promise<string> {
+        return JSON.stringify({
+          existing_solutions: [
+            {
+              label: "Recharge",
+              positioning_summary: "Built for growing and enterprise subscription brands.",
+              positioning_summary_quote: "built for growing and enterprise subscription brands",
+              positioning_summary_is_competitor_stated: true,
+              pricing_summary: null,
+              pricing_summary_quote: null,
+              strengths: [],
+              weaknesses: [],
+              estimated_market_share: null,
+              evidence_refs: ["document doc-999-fake"],
+            },
+          ],
+          business_models: [],
+        });
+      }
+    }
+    const result = await runCompetitiveAnalysisSandbox(new DocumentPrefixFakeIdMockLLM(), competitiveAnalysisInputDocs);
+    expect(result.parsed).not.toBeNull();
+    expect(result.boundedRuleViolations.some((v) => v.includes("Recharge") && v.includes("nonexistent evidence_refs"))).toBe(true);
   });
 });
