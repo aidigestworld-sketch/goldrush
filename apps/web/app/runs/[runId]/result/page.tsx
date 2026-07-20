@@ -29,7 +29,10 @@ export default async function RunResultPage({ params }: Props) {
   }
 
   // Run isn't done yet — send them to the live status view instead.
-  if (result.overall !== "completed") {
+  // "insufficient_evidence" IS terminal (Compression finished; no winner
+  // promoted) so it renders the result page's "no opportunity cleared the
+  // bar" / "no candidates ever composed" branches — see RunResultView.
+  if (result.overall !== "completed" && result.overall !== "insufficient_evidence") {
     redirect(`/runs/${runId}`);
   }
 

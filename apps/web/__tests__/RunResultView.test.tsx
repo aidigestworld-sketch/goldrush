@@ -368,6 +368,25 @@ describe("RunResultPage — redirect", () => {
     expect(screen.getByTestId("run-result-view")).toBeInTheDocument();
   });
 
+  it("does not redirect when overall is insufficient_evidence (renders 'not promoted' detail)", async () => {
+    // Regression for the 2026-07-20 empty-cascade case: the derivation
+    // now returns "insufficient_evidence" instead of "completed" for
+    // empty-evidence runs, so the redirect gate must let this state
+    // through — otherwise the founder is bounced back to the status
+    // view and can't ever see the (empty) result page.
+    const INSUFFICIENT = makeResult(
+      "insufficient_evidence",
+      null,
+      [AAE43D53_CANDIDATE],
+      "insufficient_evidence"
+    );
+    mockGetRunResult.mockResolvedValueOnce(INSUFFICIENT);
+    const element = await RunResultPage({ params: Promise.resolve({ runId: "r1" }) });
+    render(element as React.ReactElement);
+    expect(mockRedirect).not.toHaveBeenCalled();
+    expect(screen.getByTestId("evaluated-not-promoted-state")).toBeInTheDocument();
+  });
+
   it("renders RunResultView with opportunity data when completed", async () => {
     mockGetRunResult.mockResolvedValueOnce(COMPLETED);
     const element = await RunResultPage({

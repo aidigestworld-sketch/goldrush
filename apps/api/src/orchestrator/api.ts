@@ -262,7 +262,7 @@ export function createOrchestratorRouter(opts: OrchestratorRouterOptions = {}): 
         startedAt: byStep.get(step)?.startedAt ?? null,
         completedAt: byStep.get(step)?.completedAt ?? null,
       }));
-      const overall = deriveOverallStatus(perStep);
+      const overall = deriveOverallStatus(perStep, pipelineRun?.status);
       return res.status(200).json({
         run: {
           runId,
@@ -303,7 +303,7 @@ export function createOrchestratorRouter(opts: OrchestratorRouterOptions = {}): 
         startedAt: byStep.get(step)?.startedAt ?? null,
         completedAt: byStep.get(step)?.completedAt ?? null,
       }));
-      const overall = deriveOverallStatus(perStep);
+      const overall = deriveOverallStatus(perStep, pipelineRun.status);
       return res.status(200).json({
         run: {
           runId,
@@ -361,10 +361,13 @@ export function createOrchestratorRouter(opts: OrchestratorRouterOptions = {}): 
         step,
         status: rows.find((r) => r.step === step)?.status ?? "not_started",
       }));
-      const overall = deriveOverallStatus(perStep);
+      const overall = deriveOverallStatus(perStep, pipelineRun.status);
 
-      // Only query for opportunity when completed — avoids a DB round-trip
-      // for in-progress and failed runs where no row will exist yet.
+      // Only query for opportunity when the run has actually terminated
+      // (completed with a winner OR insufficient_evidence — either way,
+      // candidate rows may exist and the frontend needs the detail).
+      // Avoids a DB round-trip for in-progress and failed runs where no
+      // row will exist yet.
       let opportunity: {
         ventureScore: number;
         confidenceScore: number;
@@ -386,7 +389,7 @@ export function createOrchestratorRouter(opts: OrchestratorRouterOptions = {}): 
         incompleteComposition: boolean | null;
       }> = [];
 
-      if (overall === "completed") {
+      if (overall === "completed" || overall === "insufficient_evidence") {
         const candidateRows = await prisma.opportunityCandidate.findMany({
           where: { runId },
           include: { promotedOpportunity: true },
@@ -558,7 +561,7 @@ export function createOrchestratorRouter(opts: OrchestratorRouterOptions = {}): 
           const cp = cps.find((r) => r.step === step);
           return { step, status: cp?.status ?? "not_started" };
         });
-        const overall = deriveOverallStatus(perStep);
+        const overall = deriveOverallStatus(perStep, run.status);
         const opp = opportunityByRun.get(run.runId) ?? null;
         return {
           runId: run.runId,
@@ -907,13 +910,25 @@ export function buildStages(perStep: StepInfo[]): Stage[] {
 //   - a failed polish doesn't flip the whole run to "failed" — the
 //     promoted opportunity is still valid, the frontend just shows the
 //     Risks/Rationale sections empty (RunResultView handles that).
-export function deriveOverallStatus(perStep: { step: DagStep; status: string }[]): string {
+export function deriveOverallStatus(
+  perStep: { step: DagStep; status: string }[],
+  pipelineRunStatus?: string | null
+): string {
   const relevant = perStep.filter((p) => p.step !== "opportunity_rationale");
   const statuses = new Set(relevant.map((p) => p.status));
   if (statuses.has("failed_permanent")) return "failed";
   if (statuses.has("running") || statuses.has("pending")) return "in_progress";
   const join = relevant.find((p) => p.step === JOIN_STEP);
-  if (join?.status === "succeeded") return "completed";
+  if (join?.status === "succeeded") {
+    // Compression can succeed with an "insufficient_evidence" terminal
+    // outcome (empty cascade — Discovery skipped, no candidates ever
+    // composed, terminalCommit writes pipeline_run.status accordingly;
+    // see emptyCascadeStatus.test.ts for the pinned invariant). Without
+    // this branch, the empty run renders identically to a real Opportunity
+    // in StatusBadge — a green "Completed" for a run that produced nothing.
+    if (pipelineRunStatus === "insufficient_evidence") return "insufficient_evidence";
+    return "completed";
+  }
   if (relevant.every((p) => p.status === "not_started")) return "queued";
   return "in_progress";
 }

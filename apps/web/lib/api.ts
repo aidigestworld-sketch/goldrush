@@ -12,7 +12,18 @@ const API_BASE =
     ? process.env.NEXT_PUBLIC_API_URL
     : "http://localhost:3000";
 
-export type RunOverallStatus = "queued" | "in_progress" | "completed" | "failed";
+// "insufficient_evidence" surfaces the empty-cascade terminal outcome
+// (Discovery skipped because no evidence for this vertical, cascading
+// through every downstream step until Compression writes
+// pipeline_run.status='insufficient_evidence'). Kept distinct from
+// "completed" so a run that produced no Opportunity doesn't render
+// identically to one that did — see StatusBadge and emptyCascadeStatus.test.ts.
+export type RunOverallStatus =
+  | "queued"
+  | "in_progress"
+  | "completed"
+  | "insufficient_evidence"
+  | "failed";
 
 export interface RunOpportunity {
   ventureScore: number;

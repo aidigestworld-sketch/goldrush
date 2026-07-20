@@ -90,6 +90,23 @@ const COMPLETED = makeStatus("completed", [
   { type: "step", ...makeStep("compression", "Compression", { status: "succeeded" }) },
 ]);
 
+// Empty-cascade terminal state: every step succeeded (Discovery skipped
+// for lack of evidence, then the whole chain no-oped) but Compression's
+// terminalCommit wrote pipeline_run.status='insufficient_evidence'. The
+// derivation surfaces that here so the badge / result link / polling all
+// treat this as terminal, not "Completed".
+const INSUFFICIENT_EVIDENCE = makeStatus("insufficient_evidence", [
+  ...STEP_STAGES.slice(0, -1).map((s) =>
+    s.type === "step"
+      ? { ...s, status: "succeeded" as const }
+      : {
+          ...s,
+          branches: s.branches.map((b) => ({ ...b, status: "succeeded" as const })),
+        }
+  ),
+  { type: "step", ...makeStep("compression", "Compression", { status: "succeeded" }) },
+]);
+
 const WITH_FAILURE = makeStatus("failed", [
   { type: "step", ...makeStep("discovery", "Discovery", { status: "succeeded" }) },
   {
@@ -259,6 +276,20 @@ describe("RunStatusView", () => {
     expect(screen.queryByTestId("result-link")).not.toBeInTheDocument();
   });
 
+  it("shows 'View Results' link when overall is insufficient_evidence", () => {
+    // The result page renders "no opportunity cleared the bar" / "no
+    // candidates ever composed" for these runs — so the link IS surfaced
+    // (unlike 'failed', which has nothing scored to show).
+    render(<RunStatusView runId="run-test-1" initialData={INSUFFICIENT_EVIDENCE} />);
+    expect(screen.getByTestId("result-link")).toBeInTheDocument();
+  });
+
+  it("renders the Insufficient Evidence badge (distinct from Completed)", () => {
+    render(<RunStatusView runId="r1" initialData={INSUFFICIENT_EVIDENCE} />);
+    expect(screen.getByTestId("status-badge-insufficient_evidence")).toBeInTheDocument();
+    expect(screen.queryByTestId("status-badge-completed")).not.toBeInTheDocument();
+  });
+
   // ── Polling behaviour ────────────────────────────────────────────────────
 
   it("does not poll when initial state is already completed", async () => {
@@ -278,13 +309,29 @@ describe("RunStatusView", () => {
     expect(mockGetRunStatus).not.toHaveBeenCalled();
   });
 
-  it("polls when overall is in_progress", async () => {
+  it("does not poll when initial state is insufficient_evidence (terminal)", async () => {
+    render(
+      <RunStatusView runId="r1" initialData={INSUFFICIENT_EVIDENCE} pollIntervalMs={10} />
+    );
+    await new Promise((r) => setTimeout(r, 60));
+    expect(mockGetRunStatus).not.toHaveBeenCalled();
+  });
+
+  it("polls when overall is in_progress, forwarding accessToken", async () => {
     mockGetRunStatus.mockResolvedValue(IN_PROGRESS);
     render(
-      <RunStatusView runId="r1" initialData={IN_PROGRESS} pollIntervalMs={20} />
+      <RunStatusView
+        runId="r1"
+        initialData={IN_PROGRESS}
+        accessToken="poll-token"
+        pollIntervalMs={20}
+      />
     );
+    // Same regression as the retry test: pass BOTH args explicitly.
+    // Without the accessToken forward, the poll silently 401'd every
+    // tick and looked identical to "still processing" on screen.
     await waitFor(
-      () => expect(mockGetRunStatus).toHaveBeenCalledWith("r1"),
+      () => expect(mockGetRunStatus).toHaveBeenCalledWith("r1", "poll-token"),
       { timeout: 200 }
     );
   });
@@ -339,7 +386,7 @@ describe("RunStatusView retry button", () => {
     expect(screen.queryByTestId("retry-button")).not.toBeInTheDocument();
   });
 
-  it("clicking retry calls retryRun then getRunStatus and transitions back to in_progress", async () => {
+  it("clicking retry calls retryRun then getRunStatus WITH the access token and transitions back to in_progress", async () => {
     mockRetryRun.mockResolvedValueOnce({ runId: "r1", retried: ["expansion"] });
     mockGetRunStatus.mockResolvedValueOnce(IN_PROGRESS);
 
@@ -349,8 +396,12 @@ describe("RunStatusView retry button", () => {
     await waitFor(() => {
       expect(mockRetryRun).toHaveBeenCalledWith("r1", "test-token");
     });
+    // Regression for the 2026-07-16 bug: the follow-up status fetch
+    // used to omit accessToken, producing a 401 "GET /runs/:id/status
+    // failed with status 401" as the retry-error banner. Assert BOTH
+    // args explicitly so anyone regressing the fix trips this test.
     await waitFor(() => {
-      expect(mockGetRunStatus).toHaveBeenCalledWith("r1");
+      expect(mockGetRunStatus).toHaveBeenCalledWith("r1", "test-token");
     });
     // After transition the retry button disappears (overall is in_progress now)
     await waitFor(() => {
@@ -477,6 +528,94 @@ describe("RunStatusView polling stops at terminal state", () => {
   // update state outside of an explicit act() wrapper (the real-timer polling
   // tests above use waitFor, which handles this; fake-timer tests use act()
   // explicitly). These warnings are expected and don't affect correctness.
+});
+
+// ── Poll error visibility ────────────────────────────────────────────────
+// Regression for the silent-catch bug: prior to the 2026-07-16 fix the
+// poll interval swallowed every error with `catch {}`, so a persistent
+// 401 (from the missing-accessToken bug) was invisible in devtools and
+// indistinguishable from "still processing" on screen.
+describe("RunStatusView poll error surfacing", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    mockGetRunStatus.mockReset();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("logs to console.error when a poll fetch fails", async () => {
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    mockGetRunStatus.mockRejectedValueOnce(new Error("Network Error"));
+
+    render(
+      <RunStatusView runId="r1" initialData={IN_PROGRESS} pollIntervalMs={1000} />
+    );
+
+    // Advance one tick — the poll fires, rejects, catch branch runs.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000);
+    });
+
+    // The log fired, the error object is captured, and the last-known
+    // state is still on screen (transient errors don't crash the view).
+    expect(errSpy).toHaveBeenCalled();
+    const loggedArgs = errSpy.mock.calls.at(-1)!;
+    expect(String(loggedArgs[0])).toContain("[RunStatusView] poll failed");
+    expect(String(loggedArgs[0])).toContain("r1");
+    expect(screen.getByTestId("stage-list")).toBeInTheDocument();
+
+    errSpy.mockRestore();
+  });
+
+  it("does NOT show the poll-failure indicator on a single hiccup", async () => {
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    mockGetRunStatus
+      .mockRejectedValueOnce(new Error("blip"))
+      .mockResolvedValueOnce(IN_PROGRESS);
+
+    render(
+      <RunStatusView runId="r1" initialData={IN_PROGRESS} pollIntervalMs={1000} />
+    );
+
+    // First tick: fails, count=1 — under threshold, no indicator.
+    await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+    expect(screen.queryByTestId("poll-failure-indicator")).not.toBeInTheDocument();
+
+    // Second tick: succeeds, count resets.
+    await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+    expect(screen.queryByTestId("poll-failure-indicator")).not.toBeInTheDocument();
+
+    errSpy.mockRestore();
+  });
+
+  it("surfaces the poll-failure indicator after 3 consecutive failures, hides it on next success", async () => {
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    mockGetRunStatus
+      .mockRejectedValueOnce(new Error("fail-1"))
+      .mockRejectedValueOnce(new Error("fail-2"))
+      .mockRejectedValueOnce(new Error("fail-3"))
+      .mockResolvedValueOnce(IN_PROGRESS);
+
+    render(
+      <RunStatusView runId="r1" initialData={IN_PROGRESS} pollIntervalMs={1000} />
+    );
+
+    // Tick 1 & 2: under threshold — indicator absent.
+    await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+    expect(screen.queryByTestId("poll-failure-indicator")).not.toBeInTheDocument();
+
+    // Tick 3: crosses threshold — indicator appears.
+    await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+    expect(screen.getByTestId("poll-failure-indicator")).toBeInTheDocument();
+
+    // Tick 4: recovery — indicator disappears (count reset on success).
+    await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+    expect(screen.queryByTestId("poll-failure-indicator")).not.toBeInTheDocument();
+
+    errSpy.mockRestore();
+  });
 });
 
 // ── formatDuration unit tests ─────────────────────────────────────────────

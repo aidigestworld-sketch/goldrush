@@ -76,6 +76,38 @@ describe("deriveOverallStatus()", () => {
     );
     expect(deriveOverallStatus(joinOnly)).toBe("completed");
   });
+
+  // Empty-cascade case (ba923046 / emptyCascadeStatus.test.ts): every
+  // step succeeds because Discovery skipped for lack of evidence, so
+  // dag_run_state alone would derive "completed". pipeline_run.status
+  // carries the actual terminal outcome ('insufficient_evidence') and
+  // MUST surface distinctly — otherwise a paying founder sees a green
+  // "Completed" badge on a run that produced nothing.
+  it('join succeeded + pipelineRunStatus="insufficient_evidence" → "insufficient_evidence"', () => {
+    const allSucceeded = DAG_STEPS.map((step) => ({ step, status: "succeeded" }));
+    expect(deriveOverallStatus(allSucceeded, "insufficient_evidence")).toBe("insufficient_evidence");
+  });
+
+  it('join succeeded + pipelineRunStatus="completed" → "completed" (winner promoted)', () => {
+    const allSucceeded = DAG_STEPS.map((step) => ({ step, status: "succeeded" }));
+    expect(deriveOverallStatus(allSucceeded, "completed")).toBe("completed");
+  });
+
+  it("insufficient_evidence never overrides a still-running or failed run", () => {
+    // Guard: the pipelineRunStatus override only kicks in when the join
+    // step has actually succeeded. A stale pipeline_run.status column
+    // from an earlier run shouldn't misclassify an in-progress or failed
+    // step chain.
+    const withRunning = allNotStarted.map((s) =>
+      s.step === "discovery" ? { ...s, status: "running" } : s
+    );
+    expect(deriveOverallStatus(withRunning, "insufficient_evidence")).toBe("in_progress");
+
+    const withFailed = allNotStarted.map((s) =>
+      s.step === "validation" ? { ...s, status: "failed_permanent" } : s
+    );
+    expect(deriveOverallStatus(withFailed, "insufficient_evidence")).toBe("failed");
+  });
 });
 
 // ── Unit: buildStages() topology ──────────────────────────────────────────────

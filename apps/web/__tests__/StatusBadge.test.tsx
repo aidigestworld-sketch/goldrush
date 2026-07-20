@@ -3,7 +3,13 @@ import { render, screen } from "@testing-library/react";
 import StatusBadge from "../components/StatusBadge";
 import type { RunOverallStatus } from "../lib/api";
 
-const ALL_STATUSES: RunOverallStatus[] = ["queued", "in_progress", "completed", "failed"];
+const ALL_STATUSES: RunOverallStatus[] = [
+  "queued",
+  "in_progress",
+  "completed",
+  "insufficient_evidence",
+  "failed",
+];
 
 describe("StatusBadge", () => {
   it.each(ALL_STATUSES)("renders %s badge with correct label", (status) => {
@@ -12,6 +18,7 @@ describe("StatusBadge", () => {
       queued: "Queued",
       in_progress: "In Progress",
       completed: "Completed",
+      insufficient_evidence: "Insufficient Evidence",
       failed: "Failed",
     };
     expect(screen.getByText(expectedLabels[status])).toBeInTheDocument();
@@ -49,6 +56,14 @@ describe("StatusBadge", () => {
     const badge = screen.getByTestId("status-badge-failed");
     expect(badge.className).toContain("bg-red-50");
     expect(badge.className).toContain("text-red-700");
+  });
+
+  it("insufficient_evidence badge has amber background class (distinct from green completed)", () => {
+    render(<StatusBadge status="insufficient_evidence" />);
+    const badge = screen.getByTestId("status-badge-insufficient_evidence");
+    expect(badge.className).toContain("bg-amber-50");
+    expect(badge.className).toContain("text-amber-800");
+    expect(badge.className).not.toContain("bg-green-50");
   });
 
   it("in_progress badge dot has animate-pulse class", () => {

@@ -42,11 +42,11 @@ interface Props {
 }
 
 export default function RunCard({ run }: Props) {
-  // Completed runs deep-link to the result page; all other states link to
-  // the status/progress view. Both are placeholder routes until those
-  // screens are built.
+  // Completed runs (winner promoted) AND insufficient_evidence runs
+  // (candidates evaluated but none passed) both have result-page content
+  // worth showing; every other state links to the status/progress view.
   const href =
-    run.overall === "completed"
+    run.overall === "completed" || run.overall === "insufficient_evidence"
       ? `/runs/${run.runId}/result`
       : `/runs/${run.runId}`;
 
