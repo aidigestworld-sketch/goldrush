@@ -23,11 +23,19 @@ export default async function VerticalRequestPage({ searchParams }: Props) {
     cache: "no-store",
   }).catch(() => null);
 
-  const founderId = sessionRes?.ok
-    ? ((await sessionRes.json()) as { founderId: string }).founderId
+  const sessionBody = sessionRes?.ok
+    ? ((await sessionRes.json()) as { founderId: string; intakeComplete?: boolean })
     : null;
 
-  if (!founderId) redirect("/login");
+  if (!sessionBody?.founderId) redirect("/login");
+
+  // Gate: this page is the "post-intake, request-a-run" step. A founder who
+  // hasn't finished intake has no FounderProfile signal for FounderFit and
+  // shouldn't be able to spend money on a run whose scoring would be starved.
+  // /auth/session derives intakeComplete from founder.intakeState.completedAt.
+  if (!sessionBody.intakeComplete) redirect("/intake");
+
+  const founderId = sessionBody.founderId;
 
   // Fetch the real price from the backend so the button label stays in sync
   // with the Stripe price without requiring a frontend deploy when it changes.

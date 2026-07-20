@@ -138,7 +138,7 @@ export function createOrchestratorRouter(opts: OrchestratorRouterOptions = {}): 
     });
     const isNew = !existing;
 
-    let founder: { id: string };
+    let founder: { id: string; intakeState: unknown };
     try {
       founder = await prisma.founder.upsert({
         where: { authUserId },
@@ -151,7 +151,7 @@ export function createOrchestratorRouter(opts: OrchestratorRouterOptions = {}): 
           constraints: [],
         },
         update: {}, // no-op: existing row is fine as-is
-        select: { id: true },
+        select: { id: true, intakeState: true },
       });
     } catch (err) {
       // Prisma converts unique-index races inside upsert, but if any residual
@@ -161,13 +161,20 @@ export function createOrchestratorRouter(opts: OrchestratorRouterOptions = {}): 
       if (!isP2002) throw err;
       const settled = await prisma.founder.findUnique({
         where: { authUserId },
-        select: { id: true },
+        select: { id: true, intakeState: true },
       });
       if (!settled) throw err;
       founder = settled;
     }
 
-    return res.json({ founderId: founder.id, authUserId, isNew });
+    // Derive intake completion from the persisted state. completedAt is the
+    // authoritative "intake done" marker (set by markIntakeComplete or
+    // forceCompleteByCapTermination in intake/turn). Surfacing it here lets
+    // the /vertical-request page gate submission without a second round-trip.
+    const intakeState = (founder.intakeState ?? null) as { completedAt?: string | null } | null;
+    const intakeComplete = intakeState?.completedAt != null;
+
+    return res.json({ founderId: founder.id, authUserId, isNew, intakeComplete });
   });
 
   // POST /hypotheses/:id/orchestrate
@@ -694,17 +701,25 @@ export function createOrchestratorRouter(opts: OrchestratorRouterOptions = {}): 
         expertise: (founder.expertise ?? []) as string[],
         distributionAssets: (founder.distributionAssets ?? []) as string[],
         capitalAvailability: founder.capitalAvailability as string | null,
+        teamSize: (founder.teamSize as number | null) ?? null,
+        geography: (founder.geography as string | null) ?? null,
       };
 
       let contradictionFlag: ContradictionFlag | null = null;
 
       // ── Answer processing (only when rawAnswer is present) ─────────────
       if (body.rawAnswer !== undefined) {
-        const VALID_FIELDS: MustFillField[] = ["expertise", "distributionAssets", "capitalAvailability"];
+        const VALID_FIELDS: MustFillField[] = [
+          "expertise",
+          "distributionAssets",
+          "capitalAvailability",
+          "teamSize",
+          "geography",
+        ];
         const fieldTarget = body.fieldTarget as MustFillField | undefined;
         if (!fieldTarget || !VALID_FIELDS.includes(fieldTarget)) {
           return res.status(400).json({
-            error: "fieldTarget is required and must be 'expertise', 'distributionAssets', or 'capitalAvailability' when rawAnswer is provided",
+            error: "fieldTarget is required and must be one of: expertise, distributionAssets, capitalAvailability, teamSize, geography (when rawAnswer is provided)",
           });
         }
 
