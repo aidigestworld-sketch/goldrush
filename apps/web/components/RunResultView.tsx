@@ -195,27 +195,30 @@ export default function RunResultView({ result, runId }: Props) {
             />
           </div>
 
-          {/* Why this opportunity */}
-          <section className="mb-10" data-testid="rationale-section">
-            <h2 className="mb-4 text-xs font-semibold uppercase tracking-widest text-gray-400">
-              Why this opportunity
-            </h2>
-            <ul className="space-y-3">
-              {opportunity.rationaleBullets.map((bullet, i) => (
-                <li
-                  key={i}
-                  className="flex gap-3 text-sm leading-relaxed text-gray-800"
-                  data-testid={`rationale-bullet-${i}`}
-                >
-                  <span
-                    className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-blue-500"
-                    aria-hidden="true"
-                  />
-                  {bullet}
-                </li>
-              ))}
-            </ul>
-          </section>
+          {/* Why this opportunity — omit entirely when OpportunityRationale
+              hasn't populated bullets, to avoid rendering an empty header. */}
+          {opportunity.rationaleBullets.length > 0 && (
+            <section className="mb-10" data-testid="rationale-section">
+              <h2 className="mb-4 text-xs font-semibold uppercase tracking-widest text-gray-400">
+                Why this opportunity
+              </h2>
+              <ul className="space-y-3">
+                {opportunity.rationaleBullets.map((bullet, i) => (
+                  <li
+                    key={i}
+                    className="flex gap-3 text-sm leading-relaxed text-gray-800"
+                    data-testid={`rationale-bullet-${i}`}
+                  >
+                    <span
+                      className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-blue-500"
+                      aria-hidden="true"
+                    />
+                    {bullet}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
 
           {/* Founder fit rationale — shown only when present */}
           {opportunity.founderFitRationale && (
@@ -229,27 +232,30 @@ export default function RunResultView({ result, runId }: Props) {
             </section>
           )}
 
-          {/* Risks & gaps */}
-          <section data-testid="risk-section">
-            <h2 className="mb-4 text-xs font-semibold uppercase tracking-widest text-gray-400">
-              Risks &amp; gaps
-            </h2>
-            <ul className="space-y-3">
-              {opportunity.riskSummary.map((risk, i) => (
-                <li
-                  key={i}
-                  className="flex gap-3 text-sm leading-relaxed text-gray-800"
-                  data-testid={`risk-bullet-${i}`}
-                >
-                  <span
-                    className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-400"
-                    aria-hidden="true"
-                  />
-                  {risk}
-                </li>
-              ))}
-            </ul>
-          </section>
+          {/* Risks & gaps — omit entirely when OpportunityRationale hasn't
+              populated the summary, to avoid rendering an empty header. */}
+          {opportunity.riskSummary.length > 0 && (
+            <section data-testid="risk-section">
+              <h2 className="mb-4 text-xs font-semibold uppercase tracking-widest text-gray-400">
+                Risks &amp; gaps
+              </h2>
+              <ul className="space-y-3">
+                {opportunity.riskSummary.map((risk, i) => (
+                  <li
+                    key={i}
+                    className="flex gap-3 text-sm leading-relaxed text-gray-800"
+                    data-testid={`risk-bullet-${i}`}
+                  >
+                    <span
+                      className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-400"
+                      aria-hidden="true"
+                    />
+                    {risk}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
         </div>
       ) : null}
     </main>

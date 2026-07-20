@@ -2,7 +2,7 @@
 //
 // Design mirrors FounderFit's grounding discipline: every generated
 // bullet MUST carry a `source_ref` naming exactly which piece of the
-// candidate's data it phrases. Two source_ref kinds are permitted:
+// candidate's data it phrases. Four source_ref kinds are permitted:
 //   1. "composition:<role>:<field>" — a specific field on a specific
 //      composition slot (e.g. "composition:market:growth_rate_estimate",
 //      "composition:business_model:operational_complexity_estimate").
@@ -10,6 +10,24 @@
 //   2. "evidence:<uuid>" — a specific Evidence row cited via
 //      node_source_refs on any of the candidate's composition slots.
 //      The uuid MUST be in the allowed set the caller passes in.
+//   3. "candidate:<field>" — a field on the promoted OpportunityCandidate
+//      row itself (founder_fit_score, founder_fit_rationale). The field
+//      MUST be in CANDIDATE_FIELD_WHITELIST. These fields were already
+//      grounding-checked upstream by FounderFit's bounded-rule gate
+//      (matched_strengths → founder_evidence_id / substring verification)
+//      before Compression promoted the candidate — accepting them here
+//      does NOT open a new fabrication surface, it restates what an
+//      earlier grounding-checked stage already committed.
+//   4. "signals:<name>[<index>]" — one entry of a signal ARRAY the
+//      prompt showed the model. <name> MUST be in SIGNAL_ARRAY_WHITELIST
+//      and <index> MUST be a valid in-bounds index into that specific
+//      array for this run (out-of-range indices are rejected the same
+//      way an invalid composition field would be). The arrays
+//      themselves are deterministically built by the agent
+//      (nullCompositionFields: scan of real null DB values;
+//      founderFitGaps: regex over the already-accepted FounderFit
+//      rationale text) — no LLM in their construction loop, so citing
+//      by index is a safe pointer, not a fabrication risk.
 //
 // Post-parse grounding check: for each bullet's source_ref, verify the
 // referenced field or evidence id actually exists in the input the
@@ -24,6 +42,7 @@
 
 import { z } from "zod";
 import type { LLMClient } from "./llmClient";
+import { parseLlmJson } from "./parseLlmJson";
 
 // Whitelist of field names per composition role. A bullet claiming
 // "composition:market:some_made_up_field" fails grounding because
@@ -78,6 +97,26 @@ export const COMPOSITION_FIELD_WHITELIST: Record<string, readonly string[]> = {
   ],
 };
 
+// Whitelist of citable fields on the promoted OpportunityCandidate itself.
+// Both are already-grounded upstream by FounderFit's bounded-rule gate:
+//   - founder_fit_score is only written when matched_strengths pass
+//     founder_evidence_id / substring verification (founderFitAgent.ts:184-202)
+//   - founder_fit_rationale is written under the same gate; it's LLM
+//     synthesis but its underlying claims were mechanically verified
+//     before it was committed. Same principle as citing hypothesis:statement.
+export const CANDIDATE_FIELD_WHITELIST: readonly string[] = [
+  "founder_fit_score",
+  "founder_fit_rationale",
+];
+
+// Whitelist of citable ARRAY signals shown to the model. Both are
+// deterministically built by opportunityRationaleAgent.ts (no LLM in
+// their construction), so an in-bounds index is a safe pointer.
+export const SIGNAL_ARRAY_WHITELIST: readonly string[] = [
+  "founder_fit_gaps",
+  "null_composition_fields",
+];
+
 const BulletSchema = z.object({
   text: z.string().min(8).max(300),
   source_ref: z.string().min(3),
@@ -124,7 +163,7 @@ const SYSTEM_PROMPT = `You are the Opportunity Rationale Agent, running in a pos
 
   risk_summary: 2 to 4 bullets. Each names ONE concrete risk or gap already visible in the candidate's data (a contradicting evidence row, a null field, a founder-fit gap, a shaky score component). Not generic risk boilerplate ("market may change") — pointed, mechanism-specific risks the data itself surfaces.
 
-THE ABSOLUTE RULE (mirrored from FounderFit): every bullet MUST carry a source_ref of one of these two shapes:
+THE ABSOLUTE RULE (mirrored from FounderFit): every bullet MUST carry a source_ref of one of these FOUR shapes:
 
   "composition:<role>:<field>"
      where <role> is exactly one of: market, audience, problem, hypothesis, business_model
@@ -135,7 +174,21 @@ THE ABSOLUTE RULE (mirrored from FounderFit): every bullet MUST carry a source_r
      where <uuid> is exactly the id of one of the evidence rows listed in the input.
      Example: "evidence:4916c993-4fba-4a03-9973-39e691fd0dc6"
 
-If you cannot ground a bullet in a real field or a real evidence id from the input, DO NOT WRITE THAT BULLET. Prefer fewer, sharper, well-grounded bullets to a full set of vague ones. Do not invent competitor names, statistics, dates, mechanisms, or dynamics beyond what the input actually contains.
+  "candidate:<field>"
+     where <field> is exactly one of: founder_fit_score, founder_fit_rationale.
+     Use this when phrasing bullets that draw on the promoted candidate's
+     founder-fit assessment (score or rationale text).
+     Example: "candidate:founder_fit_score"
+
+  "signals:<name>[<index>]"
+     where <name> is exactly one of: founder_fit_gaps, null_composition_fields
+     and <index> is a valid in-bounds index into that array as shown in the
+     [signals ...] block of the input. Do NOT invent indices — cite ONLY
+     entries that actually exist in the array.
+     Example: "signals:founder_fit_gaps[0]"
+     Example: "signals:null_composition_fields[2]"
+
+If you cannot ground a bullet in one of the four shapes above using ONLY values that actually appear in the input, DO NOT WRITE THAT BULLET. Prefer fewer, sharper, well-grounded bullets to a full set of vague ones. Do not invent competitor names, statistics, dates, mechanisms, or dynamics beyond what the input actually contains. Never omit a prefix — "founder_fit_gaps[0]" without "signals:" is INVALID and will be rejected.
 
 Phrasing preference: prefer precise, mechanism-grounded language over vague hedging. "Willingness-to-pay signal is 0.82 on a scale where 1.0 is definite prior payment" beats "there is some evidence customers might pay." If the underlying number is uncertain, name that uncertainty explicitly rather than softening the claim.
 
@@ -202,10 +255,11 @@ export async function runOpportunityRationaleSandbox(
   const groundingViolations: string[] = [];
   let parsed: RationaleOutput | null = null;
 
-  try {
-    const cleaned = rawResponse.trim().replace(/^```json\s*/i, "").replace(/```\s*$/, "");
-    const json = JSON.parse(cleaned);
-    const result = RationaleOutputSchema.safeParse(json);
+  const parseResult = parseLlmJson(rawResponse);
+  if (parseResult.error) {
+    validationErrors.push(parseResult.error);
+  } else {
+    const result = RationaleOutputSchema.safeParse(parseResult.data);
     if (!result.success) {
       validationErrors.push(result.error.toString());
     } else {
@@ -247,17 +301,58 @@ export async function runOpportunityRationaleSandbox(
               `${kind}: source_ref "${ref}" — evidence id "${id}" was not in the input's evidence list (invented citation)`
             );
           }
+        } else if (ref.startsWith("candidate:")) {
+          const field = ref.slice("candidate:".length);
+          if (!field) {
+            groundingViolations.push(
+              `${kind}: source_ref "${ref}" malformed — expected candidate:<field>`
+            );
+            return;
+          }
+          if (!CANDIDATE_FIELD_WHITELIST.includes(field)) {
+            groundingViolations.push(
+              `${kind}: source_ref "${ref}" — field "${field}" is not a citable candidate field (allowed: ${CANDIDATE_FIELD_WHITELIST.join(", ")})`
+            );
+          }
+        } else if (ref.startsWith("signals:")) {
+          // Shape: signals:<name>[<index>]. Both segments required — an
+          // index-less signals:founder_fit_gaps is meaningless because
+          // the model must be pointing at a specific entry the input
+          // showed it, not the array as a whole.
+          const remainder = ref.slice("signals:".length);
+          const m = remainder.match(/^([a-z_]+)\[(-?\d+)\]$/);
+          if (!m) {
+            groundingViolations.push(
+              `${kind}: source_ref "${ref}" malformed — expected signals:<name>[<index>]`
+            );
+            return;
+          }
+          const [, name, idxStr] = m;
+          if (!SIGNAL_ARRAY_WHITELIST.includes(name)) {
+            groundingViolations.push(
+              `${kind}: source_ref "${ref}" — signal "${name}" is not a citable signal (allowed: ${SIGNAL_ARRAY_WHITELIST.join(", ")})`
+            );
+            return;
+          }
+          const idx = Number(idxStr);
+          const arr =
+            name === "founder_fit_gaps"
+              ? input.signals.founderFitGaps
+              : input.signals.nullCompositionFields;
+          if (!Number.isInteger(idx) || idx < 0 || idx >= arr.length) {
+            groundingViolations.push(
+              `${kind}: source_ref "${ref}" — index ${idx} out of bounds for signals.${name} (length=${arr.length})`
+            );
+          }
         } else {
           groundingViolations.push(
-            `${kind}: source_ref "${ref}" — must start with either "composition:" or "evidence:"`
+            `${kind}: source_ref "${ref}" — must start with "composition:", "evidence:", "candidate:", or "signals:"`
           );
         }
       };
       for (const b of parsed.rationale_bullets) validate(b, "rationale_bullets");
       for (const b of parsed.risk_summary) validate(b, "risk_summary");
     }
-  } catch (err) {
-    validationErrors.push(`JSON parse failed: ${(err as Error).message}`);
   }
 
   return { rawResponse, parsed, validationErrors, groundingViolations };

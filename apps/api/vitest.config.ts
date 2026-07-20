@@ -55,6 +55,7 @@ export default defineConfig({
       "src/orchestrator/__tests__/workerFailFast.test.ts",
       "src/orchestrator/__tests__/reconciliation.test.ts",
       "src/orchestrator/__tests__/discoveryEmptyRetry.test.ts",
+      "src/orchestrator/__tests__/opportunityRationaleWiring.test.ts",
       "src/orchestrator/__tests__/authSessionRace.test.ts",
       "src/orchestrator/__tests__/intakeFreshTurnIdempotency.test.ts",
       "src/services/__tests__/agentExecutionLog.rawOutput.test.ts",

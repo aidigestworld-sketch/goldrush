@@ -1,4 +1,4 @@
-// Worker registry — 12 workers, one per step. Each worker:
+// Worker registry — one worker per DAG step (see DAG_STEPS). Each worker:
 //   - executes the handler (with the checkpoint idempotency wrap)
 //   - on completed: calls advance(step, data) to enqueue the next
 //   - on failed w/ retries exhausted: marks the checkpoint failed_permanent

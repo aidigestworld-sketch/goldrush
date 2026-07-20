@@ -883,13 +883,23 @@ export function buildStages(perStep: StepInfo[]): Stage[] {
 // "in_progress"— at least one step is running or pending
 // "failed"     — at least one step is permanently failed
 // "completed"  — the terminal join step (compression) has succeeded
+//
+// opportunity_rationale is a POST-JOIN polish step (fills empty
+// rationale_bullets / risk_summary on the already-committed Opportunity
+// row). Its status is DELIBERATELY excluded from this derivation so:
+//   - a still-running polish doesn't flip a "completed" run back to
+//     "in_progress"
+//   - a failed polish doesn't flip the whole run to "failed" — the
+//     promoted opportunity is still valid, the frontend just shows the
+//     Risks/Rationale sections empty (RunResultView handles that).
 export function deriveOverallStatus(perStep: { step: DagStep; status: string }[]): string {
-  const statuses = new Set(perStep.map((p) => p.status));
+  const relevant = perStep.filter((p) => p.step !== "opportunity_rationale");
+  const statuses = new Set(relevant.map((p) => p.status));
   if (statuses.has("failed_permanent")) return "failed";
   if (statuses.has("running") || statuses.has("pending")) return "in_progress";
-  const join = perStep.find((p) => p.step === JOIN_STEP);
+  const join = relevant.find((p) => p.step === JOIN_STEP);
   if (join?.status === "succeeded") return "completed";
-  if (perStep.every((p) => p.status === "not_started")) return "queued";
+  if (relevant.every((p) => p.status === "not_started")) return "queued";
   return "in_progress";
 }
 

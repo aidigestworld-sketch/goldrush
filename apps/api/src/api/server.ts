@@ -3,8 +3,8 @@
 //
 // The API and the worker pool run in the same process for MVP simplicity
 // — no need for a separate worker service until we need to scale
-// horizontally. `startWorkers()` boots all 12 workers on server start;
-// each keeps a long-lived Redis connection.
+// horizontally. `startWorkers()` boots one worker per DAG step (see
+// DAG_STEPS) on server start; each keeps a long-lived Redis connection.
 import cors from "cors";
 import express from "express";
 import type { Express } from "express";

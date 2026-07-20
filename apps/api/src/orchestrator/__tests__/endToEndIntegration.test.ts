@@ -25,6 +25,7 @@ import { startWorkers, stopWorkers } from "../worker";
 import { enqueueStep } from "../sequencing";
 import * as checkpoint from "../checkpoint.repository";
 import { getQueue, closeAll } from "../queues";
+import { DAG_STEPS } from "../steps";
 
 const RUN_ID = "28e862eb-7d47-4c8c-aa7d-66510bbe0166";
 const TAG = "test-e2e-orch-";
@@ -128,7 +129,12 @@ async function main() {
   await seedNullConfidenceRows();
 
   const workers = startWorkers();
-  check(workers.length === 12, `startWorkers boots 12 workers (got ${workers.length})`);
+  // Worker count follows DAG_STEPS.length, currently 13 (12 stages +
+  // opportunity_rationale post-terminal polish).
+  check(
+    workers.length === DAG_STEPS.length,
+    `startWorkers boots ${DAG_STEPS.length} workers (got ${workers.length})`
+  );
 
   try {
     // Snapshot the seeded rows' statuses BEFORE enqueue so we can

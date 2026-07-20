@@ -24,12 +24,17 @@ import { runScoringAgent } from "../agents/live/scoringAgent";
 import { runConfidenceMode2Agent } from "../agents/live/confidenceMode2Agent";
 import { runFounderFitAgent } from "../agents/live/founderFitAgent";
 import { runCompressionAgent } from "../agents/live/compressionAgent";
+import { runOpportunityRationaleAgent } from "../agents/live/opportunityRationaleAgent";
 import { searchForHypothesisEvidence } from "../pipeline/searchForHypothesisEvidence";
 import { prisma } from "../db/client";
 import { makeNimLlmForAgent } from "./llmFactory";
 import * as checkpoint from "./checkpoint.repository";
 import { loadRunContext } from "./runContext";
-import { tryResolveProblemIdForRun, tryResolveCandidateIdForRun } from "./idResolvers";
+import {
+  tryResolveProblemIdForRun,
+  tryResolveCandidateIdForRun,
+  tryResolveOpportunityIdForRun,
+} from "./idResolvers";
 import type { DagStep } from "./steps";
 
 export interface JobData {
@@ -39,6 +44,12 @@ export interface JobData {
   marketId?: string;
   problemId?: string;
   candidateId?: string;
+  // Populated when advance() enqueues opportunity_rationale after
+  // compression — Compression returns the id of the newly-created
+  // opportunity row, so the follow-on handler can go straight to it
+  // without a fallback DB lookup. If missing (resume/retry from
+  // checkpoint), the handler self-resolves via idResolvers.
+  opportunityId?: string;
   // CompetitiveAnalysis: name-to-evidence-ids map. Serialized as a
   // plain object over the job payload; converted to Map inside the
   // handler.
@@ -275,6 +286,30 @@ export const handlers: Record<DagStep, (data: JobData) => Promise<HandlerResult>
       }
       const result = await runCompressionAgent(data.runId);
       return { extra: { ...result } };
+    }),
+
+  opportunity_rationale: (data) =>
+    withIdempotency("opportunity_rationale", data, async () => {
+      // Post-terminal polish step. Compression has already committed the
+      // Opportunity row with empty rationale_bullets / risk_summary
+      // arrays; this step fills them in a SEPARATE transaction so
+      // Compression's promotion path isn't held under LLM latency
+      // (see compressionAgent.ts header). Failures here MUST NOT flip
+      // the run's overall status back to in_progress — the run is
+      // already user-visibly "completed" by Compression. The frontend
+      // (RunResultView) already handles empty rationale/risk arrays
+      // gracefully, so a permanent failure here degrades gracefully to
+      // "no polish text shown," not a broken UI.
+      const opportunityId =
+        data.opportunityId ?? (await tryResolveOpportunityIdForRun(data.runId, undefined));
+      if (!opportunityId) {
+        // No promoted opportunity (Compression hit insufficient_evidence).
+        // Legitimate skip — nothing to phrase.
+        return { skipped: true, skipReason: "no promoted opportunity for this run" };
+      }
+      const llm = await makeNimLlmForAgent("OpportunityRationale");
+      const result = await runOpportunityRationaleAgent(data.runId, opportunityId, llm);
+      return { skipped: result.skipped, skipReason: result.skipReason, extra: { ...result } };
     }),
 };
 

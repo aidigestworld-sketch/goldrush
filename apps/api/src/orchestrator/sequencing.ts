@@ -18,9 +18,17 @@
 
 import { FlowProducer } from "bullmq";
 import { getQueue, getFlowProducer } from "./queues";
-import { LINEAR_ORDER, FORK_CHILDREN, JOIN_STEP, nextLinearStep, type DagStep } from "./steps";
+import {
+  LINEAR_ORDER,
+  FORK_CHILDREN,
+  JOIN_STEP,
+  POST_JOIN_STEP,
+  nextLinearStep,
+  type DagStep,
+} from "./steps";
 import { queueName } from "./queues";
 import * as checkpoint from "./checkpoint.repository";
+import { tryResolveOpportunityIdForRun } from "./idResolvers";
 import type { JobData } from "./handlers";
 
 // enqueueStep: idempotent by dag_run_state. If the target step's row
@@ -65,8 +73,24 @@ export async function advance(justCompleted: DagStep, data: JobData): Promise<vo
     return;
   }
   if (justCompleted === JOIN_STEP) {
-    // Compression is terminal; the underlying agent has already updated
-    // pipeline_run.status. Nothing else to enqueue.
+    // Compression's underlying agent has already updated pipeline_run.status
+    // and the frontend already renders the run as "completed" (see
+    // deriveOverallStatus in api.ts, which is unchanged). Kick off
+    // OpportunityRationale as a post-terminal polish step that fills
+    // opportunity.rationale_bullets / risk_summary — decoupled from the
+    // promotion transaction so a failure or slow LLM doesn't hold the
+    // user-visible run status.
+    const opportunityId = await tryResolveOpportunityIdForRun(data.runId, undefined);
+    if (!opportunityId) {
+      // Compression promoted nothing (insufficient_evidence terminal).
+      // No opportunity row to phrase — skip cleanly, no checkpoint row.
+      return;
+    }
+    await enqueueStep(POST_JOIN_STEP, { ...data, opportunityId });
+    return;
+  }
+  if (justCompleted === POST_JOIN_STEP) {
+    // Truly terminal — nothing else to enqueue.
     return;
   }
   const next = nextLinearStep(justCompleted);
@@ -130,12 +154,10 @@ export async function resumeFromCheckpoint(data: JobData): Promise<{ resumedFrom
   const cm2 = byStep.get("confidence_mode2");
   const ff = byStep.get("founder_fit");
   const comp = byStep.get(JOIN_STEP);
-  if (comp?.status === "succeeded") return { resumedFrom: null };
 
   if (
     (!cm2 || cm2.status !== "succeeded") ||
-    (!ff || ff.status !== "succeeded") ||
-    !comp
+    (!ff || ff.status !== "succeeded")
   ) {
     // Rebuild the fork/join flow if any of the three rows are missing
     // or unfinished.
@@ -143,7 +165,19 @@ export async function resumeFromCheckpoint(data: JobData): Promise<{ resumedFrom
     return { resumedFrom: "confidence_mode2" };
   }
 
-  // Both branches succeeded but compression not; enqueue it alone.
-  await enqueueStep(JOIN_STEP, data);
-  return { resumedFrom: JOIN_STEP };
+  if (!comp || comp.status !== "succeeded") {
+    // Both branches succeeded but compression not; enqueue it alone.
+    await enqueueStep(JOIN_STEP, data);
+    return { resumedFrom: JOIN_STEP };
+  }
+
+  // Compression succeeded — check the post-join polish step. Only
+  // (re-)enqueue if a promoted opportunity actually exists; otherwise
+  // there's nothing to phrase and the run is truly done.
+  const rationale = byStep.get(POST_JOIN_STEP);
+  if (rationale?.status === "succeeded") return { resumedFrom: null };
+  const opportunityId = await tryResolveOpportunityIdForRun(data.runId, undefined);
+  if (!opportunityId) return { resumedFrom: null };
+  await enqueueStep(POST_JOIN_STEP, { ...data, opportunityId });
+  return { resumedFrom: POST_JOIN_STEP };
 }

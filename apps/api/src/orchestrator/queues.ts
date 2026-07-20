@@ -85,6 +85,7 @@ export const WORKER_CONFIG: Record<DagStep, WorkerConcurrencyConfig> = {
   confidence_mode2: { concurrency: 2 }, // deterministic
   founder_fit: { concurrency: 1 }, // LLM
   compression: { concurrency: 1 }, // holds a $transaction
+  opportunity_rationale: { concurrency: 1 }, // LLM (post-terminal polish)
 };
 
 export function listQueueNames(): string[] {

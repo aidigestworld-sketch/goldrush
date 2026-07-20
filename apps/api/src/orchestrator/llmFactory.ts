@@ -6,9 +6,30 @@
 import { modelRoutingConfigRepository } from "../repositories/modelRoutingConfig.repository";
 import { NimLLMClient } from "../sandbox/nimLLMClient";
 
+// Agents that reuse another agent's model_routing_config row when they
+// don't have a dedicated one. Established by runOpportunityRationaleLive.ts
+// (OpportunityRationale → FounderFit) and buildIntakeLLMClient in api.ts
+// (IntakeExtraction → FounderFit). Lifted here so the orchestrator
+// handler path follows the same rule as the manual live-runner path.
+const AGENT_ROUTING_FALLBACKS: Record<string, string> = {
+  OpportunityRationale: "FounderFit",
+};
+
 export async function makeNimLlmForAgent(agentName: string): Promise<NimLLMClient> {
-  const config = await modelRoutingConfigRepository.latestForAgent(agentName);
-  if (!config) throw new Error(`no model_routing_config found for agent=${agentName}`);
+  const primary = await modelRoutingConfigRepository.latestForAgent(agentName);
+  const config =
+    primary ??
+    (AGENT_ROUTING_FALLBACKS[agentName]
+      ? await modelRoutingConfigRepository.latestForAgent(AGENT_ROUTING_FALLBACKS[agentName])
+      : null);
+  if (!config) {
+    const fallback = AGENT_ROUTING_FALLBACKS[agentName];
+    throw new Error(
+      fallback
+        ? `no model_routing_config found for agent=${agentName} (also tried fallback=${fallback})`
+        : `no model_routing_config found for agent=${agentName}`
+    );
+  }
   const apiKey = process.env.NVIDIA_API_KEY;
   if (!apiKey) throw new Error("NVIDIA_API_KEY is not set");
   return new NimLLMClient(apiKey, config.nimModelId);

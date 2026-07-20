@@ -1,8 +1,14 @@
-// Canonical enum for the 12 DAG stages, in execution order.
+// Canonical enum for the DAG stages, in execution order.
 // The strings match dag_run_state.step's CHECK constraint values.
 // Kept in one file so migration + queues + handlers + API share one
 // source of truth — if the check constraint ever needs to change,
 // this constant is what a grep will point to.
+//
+// opportunity_rationale is a POST_JOIN_STEP — it runs after compression
+// as a polish transaction that fills opportunity.rationale_bullets /
+// risk_summary. It is NOT part of LINEAR_ORDER or the fork/join topology,
+// and the user-visible "completed" derivation ignores it (a still-running
+// or failed rationale must not flip the run back to in_progress).
 
 export const DAG_STEPS = [
   "discovery",
@@ -17,6 +23,7 @@ export const DAG_STEPS = [
   "confidence_mode2",
   "founder_fit",
   "compression",
+  "opportunity_rationale",
 ] as const;
 
 export type DagStep = (typeof DAG_STEPS)[number];
@@ -40,6 +47,12 @@ export const LINEAR_ORDER: DagStep[] = [
 export const FORK_CHILDREN: DagStep[] = ["confidence_mode2", "founder_fit"];
 export const JOIN_STEP: DagStep = "compression";
 
+// Post-join follow-on. Enqueued by sequencing.advance when compression
+// succeeds; not part of any topology group above. Kept as its own concept
+// so status-derivation code can filter it explicitly (rather than by
+// implicit knowledge of "which one is the polish step").
+export const POST_JOIN_STEP: DagStep = "opportunity_rationale";
+
 export const STEP_LABELS: Record<DagStep, string> = {
   discovery: "Discovery",
   expansion: "Expansion",
@@ -53,6 +66,7 @@ export const STEP_LABELS: Record<DagStep, string> = {
   confidence_mode2: "Confidence (Mode 2)",
   founder_fit: "Founder Fit",
   compression: "Compression",
+  opportunity_rationale: "Opportunity Rationale",
 };
 
 export function nextLinearStep(current: DagStep): DagStep | null {
