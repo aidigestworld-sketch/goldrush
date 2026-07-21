@@ -1,0 +1,165 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  typecheck:
+    name: typecheck (${{ matrix.workspace }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        workspace: [apps/api, apps/web]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: ${{ matrix.workspace }}/package-lock.json
+      - name: Install dependencies
+        working-directory: ${{ matrix.workspace }}
+        run: npm ci
+      - name: Generate Prisma client (apps/api only)
+        if: matrix.workspace == 'apps/api'
+        working-directory: apps/api
+        run: npx prisma generate
+      - name: Typecheck
+        working-directory: ${{ matrix.workspace }}
+        run: npx tsc --noEmit
+
+  test-api:
+    name: test apps/api
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: opportunity_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/opportunity_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: apps/api/package-lock.json
+      - name: Install dependencies
+        working-directory: apps/api
+        run: npm ci
+      - name: Generate Prisma client
+        working-directory: apps/api
+        run: npx prisma generate
+      - name: Apply app-DB SQL migrations to ephemeral Postgres
+        env:
+          PGPASSWORD: postgres
+        run: |
+          set -e
+          for f in $(ls apps/api/src/db/migrations/*.sql | sort); do
+            echo "Applying $f"
+            psql -v ON_ERROR_STOP=1 \
+              -h localhost -U postgres -d opportunity_test \
+              -f "$f"
+          done
+      - name: Run tests
+        working-directory: apps/api
+        run: npm test
+
+  test-web:
+    name: test apps/web
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - name: Install dependencies
+        working-directory: apps/web
+        run: npm ci
+      - name: Run tests
+        working-directory: apps/web
+        run: npm test
+
+  # Informational only — does not block merge. Promote to required after it's
+  # proven reliable and after any pre-existing drift (see duplicate migration
+  # number 019_pipeline_run_refund_and_retry.sql / 019_pipeline_run_resolution_and_retry.sql)
+  # has been resolved.
+  migrate-apply-fresh:
+    name: migrations apply-fresh (informational)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: migration_check
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply every SQL migration in numeric order
+        env:
+          PGPASSWORD: postgres
+        run: |
+          set -e
+          for f in $(ls apps/api/src/db/migrations/*.sql | sort); do
+            echo "==> $f"
+            psql -v ON_ERROR_STOP=1 \
+              -h localhost -p 5433 -U postgres -d migration_check \
+              -f "$f"
+          done
+
+  # Supabase drift check (deferred).
+  #
+  # `npm run db:migrate:supabase:list` compares apps/api/supabase/migrations/
+  # against the live Supabase project pointed at by SUPABASE_DB_URL. Wiring
+  # this to the production Supabase project from CI would hand a merge-time
+  # process credentials to prod, so this job is intentionally not enabled.
+  #
+  # To enable, create a disposable Supabase branch/preview DB and expose its
+  # pooler URL as the secret SUPABASE_DB_URL_CI. Then add the job below,
+  # keeping continue-on-error until you trust it.
+  #
+  # supabase-drift-check:
+  #   name: supabase migrations drift (informational)
+  #   runs-on: ubuntu-latest
+  #   continue-on-error: true
+  #   env:
+  #     SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL_CI }}
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: actions/setup-node@v4
+  #       with:
+  #         node-version: '22'
+  #         cache: npm
+  #         cache-dependency-path: apps/api/package-lock.json
+  #     - working-directory: apps/api
+  #       run: npm ci
+  #     - working-directory: apps/api
+  #       run: npm run db:migrate:supabase:list
