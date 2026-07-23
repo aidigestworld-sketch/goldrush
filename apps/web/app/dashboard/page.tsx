@@ -13,9 +13,18 @@ export default async function DashboardPage() {
 
   const { data: { session } } = await supabase.auth.getSession();
 
+  // TEMP DEBUG (revert once root cause found): distinguish empty-token from
+  // real-token-rejected. If accessTokenPresent=false with userId set, the
+  // dashboard hit the known Supabase SSR asymmetry: getUser() succeeded via
+  // network but getSession() returned no cookie-derived session.
+  console.log("[DashboardPage] pre-fetch auth state", {
+    userId: user.id,
+    accessTokenPresent: Boolean(session?.access_token),
+    accessTokenLength: session?.access_token?.length ?? 0,
+  });
+
   // TEMP DEBUG (revert once root cause found): surface underlying network error
-  // instead of silently swallowing it, so the Vercel runtime log shows why the
-  // fetch to the Railway API is failing (DNS, TLS, ECONNREFUSED, timeout, etc.).
+  // instead of silently swallowing it.
   const sessionRes = await fetch(`${API_BASE}/auth/session`, {
     headers: { authorization: `Bearer ${session?.access_token ?? ""}` },
     cache: "no-store",
@@ -30,6 +39,21 @@ export default async function DashboardPage() {
     });
     return null;
   });
+
+  // TEMP DEBUG (revert once root cause found): if the API responded but not
+  // ok, log status + body so we know if it's 401 missing/invalid token, a
+  // 5xx, or something else — instead of the generic banner.
+  if (sessionRes && !sessionRes.ok) {
+    const bodyText = await sessionRes
+      .clone()
+      .text()
+      .catch(() => "<unreadable>");
+    console.error("[DashboardPage] session fetch non-ok", {
+      status: sessionRes.status,
+      statusText: sessionRes.statusText,
+      body: bodyText.slice(0, 500),
+    });
+  }
 
   const founderId = sessionRes?.ok
     ? ((await sessionRes.json()) as { founderId: string }).founderId
