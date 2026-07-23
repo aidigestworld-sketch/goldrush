@@ -13,10 +13,31 @@ export default async function DashboardPage() {
 
   const { data: { session } } = await supabase.auth.getSession();
 
-  const sessionRes = await fetch(`${API_BASE}/auth/session`, {
-    headers: { authorization: `Bearer ${session?.access_token ?? ""}` },
-    cache: "no-store",
-  }).catch(() => null);
+  // TEMP DEBUG: probe Vercel→Railway edge behavior (429 IP-scoping hypothesis)
+  console.log("[TEMP DEBUG dashboard] API_BASE=", API_BASE, "hasToken=", Boolean(session?.access_token));
+  let sessionRes: Response | null = null;
+  let sessionThrew: unknown = null;
+  try {
+    sessionRes = await fetch(`${API_BASE}/auth/session`, {
+      headers: { authorization: `Bearer ${session?.access_token ?? ""}` },
+      cache: "no-store",
+    });
+  } catch (err) {
+    sessionThrew = err;
+  }
+  if (sessionThrew) {
+    console.log("[TEMP DEBUG dashboard] /auth/session FETCH THREW:", String(sessionThrew));
+  } else if (sessionRes) {
+    const bodyText = await sessionRes.clone().text().catch(() => "<body read failed>");
+    console.log(
+      "[TEMP DEBUG dashboard] /auth/session status=", sessionRes.status,
+      "server=", sessionRes.headers.get("server"),
+      "x-railway-edge=", sessionRes.headers.get("x-railway-edge"),
+      "x-hikari-trace=", sessionRes.headers.get("x-hikari-trace"),
+      "body=", bodyText.slice(0, 300),
+    );
+  }
+  // END TEMP DEBUG
 
   const founderId = sessionRes?.ok
     ? ((await sessionRes.json()) as { founderId: string }).founderId
@@ -37,9 +58,14 @@ export default async function DashboardPage() {
   let error: string | null = null;
 
   try {
+    // TEMP DEBUG: log founderId presence before calling
+    console.log("[TEMP DEBUG dashboard] calling getFounderRuns founderId=", founderId);
     runs = await getFounderRuns(founderId, session?.access_token ?? "");
+    console.log("[TEMP DEBUG dashboard] getFounderRuns returned count=", runs.length);
   } catch (err) {
     console.error("[DashboardPage] failed to fetch runs:", err);
+    // TEMP DEBUG: expose full error shape
+    console.log("[TEMP DEBUG dashboard] getFounderRuns THREW:", String(err));
     error = (err as Error).message;
   }
 

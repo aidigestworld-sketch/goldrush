@@ -147,6 +147,29 @@ export interface RunResult {
   opportunity: OpportunityDetail | null;
   /** Every candidate row for the run — empty when zero candidates ever composed. */
   candidates: EvaluatedCandidate[];
+  /** Refund/retry offer state for insufficient_evidence runs (migration 019). */
+  postRunActions: PostRunActionsState;
+}
+
+/**
+ * Refund / free-retry offer surfaced on insufficient_evidence runs.
+ *
+ *   offered: true only when the run is insufficient_evidence, the founder
+ *   hasn't already resolved it, AND the run's parent chain walks up to a
+ *   paid Stripe session. Dev/seeded runs (no Stripe root) never see this.
+ *
+ *   resolution: past choice — 'refunded' | 'retried' | 'accepted' | null.
+ *   Once non-null the UI stops showing action buttons.
+ *
+ *   retryCapReached: true when the paid checkout has already spent its
+ *   1 free retry — UI hides the "Retry" button and shows only "Refund".
+ */
+export interface PostRunActionsState {
+  offered: boolean;
+  resolution: string | null;
+  resolvedAt: string | null;
+  refundId: string | null;
+  retryCapReached: boolean;
 }
 
 export async function getRunResult(runId: string, accessToken?: string): Promise<RunResult> {
@@ -242,6 +265,66 @@ export async function retryRun(
   return res.json() as Promise<{ runId: string; retried: string[] }>;
 }
 
+// ── Post-run actions: refund / free retry ─────────────────────────────────
+//
+// Only offered on insufficient_evidence terminal runs. See PostRunActionsState
+// on RunResult for the gating logic — the API returns offered=false when
+// either the run doesn't qualify or the founder has already resolved it.
+
+export interface RefundRunResponse {
+  runId: string;
+  resolution: "refunded";
+  refundId: string | null;
+  stripeStatus?: string;
+  alreadyRefunded?: boolean;
+  alreadyRefundedAtStripe?: boolean;
+  alreadyResolvedByRace?: boolean;
+  message?: string;
+}
+
+export async function refundRun(
+  runId: string,
+  accessToken?: string
+): Promise<RefundRunResponse> {
+  const res = await fetch(`${API_BASE}/runs/${runId}/refund`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      ...(accessToken ? { authorization: `Bearer ${accessToken}` } : {}),
+    },
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => res.statusText);
+    throw new Error(`POST /runs/${runId}/refund failed (${res.status}): ${text}`);
+  }
+  return res.json() as Promise<RefundRunResponse>;
+}
+
+export interface FreeRetryRunResponse {
+  /** The NEW pipeline_run's id — frontend should navigate to /runs/:newRunId. */
+  runId: string;
+  parentRunId: string;
+  resolution: "retried";
+}
+
+export async function freeRetryRun(
+  runId: string,
+  accessToken?: string
+): Promise<FreeRetryRunResponse> {
+  const res = await fetch(`${API_BASE}/runs/${runId}/free-retry`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      ...(accessToken ? { authorization: `Bearer ${accessToken}` } : {}),
+    },
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => res.statusText);
+    throw new Error(`POST /runs/${runId}/free-retry failed (${res.status}): ${text}`);
+  }
+  return res.json() as Promise<FreeRetryRunResponse>;
+}
+
 // ── Stripe checkout ───────────────────────────────────────────────────────
 
 export async function createCheckoutSession(
@@ -287,14 +370,104 @@ export async function getCheckoutStatus(
   return res.json() as Promise<CheckoutStatus>;
 }
 
+// ── Free Market Signal Check ──────────────────────────────────────────────
+//
+// Discovery-only path — one per (founder, vertical). See migration 020 for
+// the DB-level partial unique index. The API 409s with
+// { error: "free_check_already_used", existingRunId } when the founder has
+// already used their slot; the frontend surfaces that as the paid CTA path.
+
+export interface SignalCheckStartResponse {
+  runId: string;
+}
+
+export interface SignalCheckAlreadyUsedError extends Error {
+  code: "free_check_already_used";
+  existingRunId: string;
+}
+
+export async function startSignalCheck(
+  founderId: string,
+  vertical: string,
+  accessToken: string
+): Promise<SignalCheckStartResponse> {
+  const res = await fetch(`${API_BASE}/founders/${founderId}/signal-check`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({ vertical }),
+  });
+  if (res.status === 409) {
+    const body = (await res.json().catch(() => ({}))) as {
+      error?: string;
+      existingRunId?: string;
+    };
+    const err = new Error(
+      body.error ?? "free_check_already_used"
+    ) as SignalCheckAlreadyUsedError;
+    err.code = "free_check_already_used";
+    err.existingRunId = body.existingRunId ?? "";
+    throw err;
+  }
+  if (!res.ok) {
+    const text = await res.text().catch(() => res.statusText);
+    throw new Error(`Signal check failed (${res.status}): ${text}`);
+  }
+  return res.json() as Promise<SignalCheckStartResponse>;
+}
+
+export interface SignalCheckResult {
+  runId: string;
+  vertical: string;
+  status: "queued" | "in_progress" | "completed" | "failed";
+  failureReason: string | null;
+  marketCount: number | null;
+  growthSignal: number | null;
+  summary: string | null;
+}
+
+export async function getSignalCheck(
+  runId: string,
+  accessToken: string
+): Promise<SignalCheckResult> {
+  const res = await fetch(`${API_BASE}/runs/${runId}/signal-check`, {
+    cache: "no-store",
+    headers: { authorization: `Bearer ${accessToken}` },
+  });
+  if (!res.ok) {
+    throw new Error(`GET /runs/${runId}/signal-check failed (${res.status})`);
+  }
+  return res.json() as Promise<SignalCheckResult>;
+}
+
 // ── Founder run list (dashboard) ──────────────────────────────────────────
 
 export async function getFounderRuns(founderId: string, accessToken?: string): Promise<FounderRun[]> {
-  const res = await fetch(`${API_BASE}/founders/${founderId}/runs`, {
-    // No caching — dashboard should always reflect live run state.
-    cache: "no-store",
-    headers: accessToken ? { authorization: `Bearer ${accessToken}` } : {},
-  });
+  // TEMP DEBUG: probe Vercel→Railway edge behavior on runs list fetch
+  const url = `${API_BASE}/founders/${founderId}/runs`;
+  console.log("[TEMP DEBUG getFounderRuns] fetching", url, "hasToken=", Boolean(accessToken));
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      // No caching — dashboard should always reflect live run state.
+      cache: "no-store",
+      headers: accessToken ? { authorization: `Bearer ${accessToken}` } : {},
+    });
+  } catch (err) {
+    console.log("[TEMP DEBUG getFounderRuns] FETCH THREW:", String(err));
+    throw err;
+  }
+  const bodyText = await res.clone().text().catch(() => "<body read failed>");
+  console.log(
+    "[TEMP DEBUG getFounderRuns] status=", res.status,
+    "server=", res.headers.get("server"),
+    "x-railway-edge=", res.headers.get("x-railway-edge"),
+    "x-hikari-trace=", res.headers.get("x-hikari-trace"),
+    "body=", bodyText.slice(0, 300),
+  );
+  // END TEMP DEBUG
   if (!res.ok) {
     throw new Error(
       `GET /founders/${founderId}/runs failed with status ${res.status}`
