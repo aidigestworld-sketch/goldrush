@@ -33,7 +33,7 @@
 
 [build]
 builder = "NIXPACKS"
-buildCommand = "npm ci && npx prisma generate"
+buildCommand = "npx prisma generate"
 
 [deploy]
 startCommand = "npm start"
