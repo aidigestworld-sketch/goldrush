@@ -13,10 +13,23 @@ export default async function DashboardPage() {
 
   const { data: { session } } = await supabase.auth.getSession();
 
+  // TEMP DEBUG (revert once root cause found): surface underlying network error
+  // instead of silently swallowing it, so the Vercel runtime log shows why the
+  // fetch to the Railway API is failing (DNS, TLS, ECONNREFUSED, timeout, etc.).
   const sessionRes = await fetch(`${API_BASE}/auth/session`, {
     headers: { authorization: `Bearer ${session?.access_token ?? ""}` },
     cache: "no-store",
-  }).catch(() => null);
+  }).catch((err) => {
+    console.error("[DashboardPage] session fetch failed", {
+      apiBase: API_BASE,
+      url: `${API_BASE}/auth/session`,
+      name: (err as Error)?.name,
+      message: (err as Error)?.message,
+      cause: (err as { cause?: unknown })?.cause,
+      stack: (err as Error)?.stack,
+    });
+    return null;
+  });
 
   const founderId = sessionRes?.ok
     ? ((await sessionRes.json()) as { founderId: string }).founderId
