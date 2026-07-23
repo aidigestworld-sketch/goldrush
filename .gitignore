@@ -18,3 +18,16 @@ graphify-out/
 # OS
 .DS_Store
 Thumbs.db
+
+.vercel
+.env*
+
+# Local run logs / scratch
+*.log
+b2b-run*.log
+
+# Nested/embedded git checkouts
+opportunity/
+
+# TypeScript incremental build info
+*.tsbuildinfo
