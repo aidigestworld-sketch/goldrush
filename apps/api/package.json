@@ -14,6 +14,9 @@
   "author": "",
   "license": "ISC",
   "type": "commonjs",
+  "engines": {
+    "node": ">=20.19.0"
+  },
   "dependencies": {
     "@mozilla/readability": "^0.6.0",
     "@prisma/adapter-pg": "^7.8.0",
