@@ -40,6 +40,13 @@ export async function GET(request: NextRequest) {
     supabaseRelated: cookieNames.filter((n) => n.startsWith("sb-")),
   });
 
+  // TEMP DEBUG: track every setAll invocation from Supabase during exchange. REMOVE.
+  const setAllInvocations: Array<{
+    count: number;
+    names: string[];
+    options: Array<Record<string, unknown>>;
+  }> = [];
+
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -49,6 +56,20 @@ export async function GET(request: NextRequest) {
           return cookieStore.getAll();
         },
         setAll(cookiesToSet) {
+          // TEMP DEBUG: capture what Supabase asked to write (names+options only, NO values). REMOVE.
+          setAllInvocations.push({
+            count: cookiesToSet.length,
+            names: cookiesToSet.map((c) => c.name),
+            options: cookiesToSet.map((c) => ({
+              secure: c.options?.secure,
+              httpOnly: c.options?.httpOnly,
+              sameSite: c.options?.sameSite,
+              domain: c.options?.domain,
+              path: c.options?.path,
+              maxAge: c.options?.maxAge,
+              expires: c.options?.expires ? String(c.options.expires) : undefined,
+            })),
+          });
           cookiesToSet.forEach(({ name, value, options }) =>
             cookieStore.set(name, value, options)
           );
@@ -80,6 +101,16 @@ export async function GET(request: NextRequest) {
     userId: data.session.user?.id,
     hasAccessToken: !!data.session.access_token,
     expiresAt: data.session.expires_at,
+    setAllInvocationCount: setAllInvocations.length,
+    setAllInvocations,
+  });
+
+  // TEMP DEBUG: read cookieStore AFTER exchange to see what Next.js recorded. REMOVE.
+  const cookiesAfterExchange = cookieStore.getAll().map((c) => c.name);
+  console.log("[TEMP DEBUG /auth/callback] cookieStore state after exchange", {
+    totalCount: cookiesAfterExchange.length,
+    allNames: cookiesAfterExchange,
+    supabaseRelated: cookiesAfterExchange.filter((n) => n.startsWith("sb-")),
   });
 
   // Ask the API whether a founder row already exists for this Supabase user.
