@@ -1,0 +1,43 @@
+# Railway service config for the Opportunity Engine API.
+#
+# In the Railway dashboard for this service, set:
+#   Settings → Source → Root Directory = apps/api
+# so Railway builds and runs from this directory. Railway auto-detects
+# this file at the root of that directory.
+#
+# PORT is injected by Railway; the server reads it via
+# process.env.PORT (apps/api/src/api/server.ts:58). Do NOT set PORT
+# manually as a variable.
+#
+# Required env vars (set in Railway → Variables):
+#   DATABASE_URL              Supabase pooler URL for the SAME project apps/web uses.
+#                             Format: postgresql://postgres.<ref>:<pw>@aws-0-<region>.pooler.supabase.com:5432/postgres
+#   SUPABASE_URL              https://<ref>.supabase.co
+#   SUPABASE_SERVICE_ROLE_KEY Supabase service-role key (NOT the anon key)
+#   REDIS_URL                 Internal URL of a Railway Redis service (add via "New → Database → Redis"),
+#                             then reference as ${{Redis.REDIS_URL}}
+#   NVIDIA_API_KEY            NIM inference API key
+#   TAVILY_API_KEY            Tavily search API key
+#   STRIPE_SECRET_KEY         Stripe API secret (sk_live_... in prod, sk_test_... in preview)
+#   STRIPE_WEBHOOK_SECRET     Stripe webhook signing secret (whsec_...), from a webhook endpoint
+#                             configured in Stripe Dashboard pointing at
+#                             https://<this-service-domain>/webhooks/stripe
+#   STRIPE_PRO_PRICE_ID       Stripe price id for the Pro plan
+#   CORS_ORIGIN               Deployed apps/web URL (e.g. https://your-app.vercel.app).
+#                             Comma-separated if you need multiple origins.
+#   WEB_ORIGIN                Deployed apps/web URL (used to build Stripe redirect URLs)
+#
+# Optional env vars (all have sensible defaults):
+#   NIM_MAX_CONCURRENT_CALLS      default 2
+#   NIM_MAX_REQUESTS_PER_MINUTE   default 15
+
+[build]
+builder = "NIXPACKS"
+buildCommand = "npm ci && npx prisma generate"
+
+[deploy]
+startCommand = "npm start"
+healthcheckPath = "/healthz"
+healthcheckTimeout = 30
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10
